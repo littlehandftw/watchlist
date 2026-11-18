@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Watchlist</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1f232c; --line:#2a2f3a;
+    --text:#e9ecf1; --muted:#9aa3b2; --accent:#f5c518; --ok:#3ecf8e;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body.modal-open{overflow:hidden}
+  button,input,select{font:inherit;color:inherit}
+  a{color:var(--accent)}
+  header{position:sticky;top:0;z-index:10;background:rgba(15,17,21,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .bar{max-width:1400px;margin:0 auto;padding:14px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  h1{margin:0 12px 0 0;font-size:22px;letter-spacing:.2px}
+  h1 span{color:var(--accent)}
+  .search{flex:1 1 220px;min-width:180px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:9px 16px;outline:none}
+  .search:focus{border-color:var(--accent)}
+  select,.btn{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer}
+  .btn:hover,select:hover{border-color:#3a4150}
+  .chips{display:flex;gap:6px}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer}
+  .chip.on{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
+  .toggle{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:pointer;user-select:none}
+  .count{color:var(--muted);font-size:13px}
+  .counts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  main{max-width:1400px;margin:0 auto;padding:22px 20px 60px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;cursor:pointer}
+  .card:hover{transform:translateY(-3px);border-color:#3a4150}
+  .poster{position:relative;aspect-ratio:2/3;background:#222;overflow:hidden}
+  .poster img{position:absolute;inset:0;z-index:1;width:100%;height:100%;object-fit:cover;display:block}
+  .ph{position:absolute;inset:0;display:flex;align-items:flex-end;padding:14px;font-weight:700;font-size:18px;line-height:1.2;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+  .badges{position:absolute;z-index:2;top:8px;left:8px;right:44px;display:flex;flex-wrap:wrap;gap:4px}
+  .badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.7);color:#fff}
+  .b-Netflix{background:#e50914}
+  .b-Prime{background:#00a8e1}
+  .seen{position:absolute;z-index:2;top:8px;right:8px;width:30px;height:30px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:15px}
+  .seen.on{background:var(--ok);color:#06240f}
+  .card.isSeen .poster img,.card.isSeen .ph{opacity:.45}
+  .body{padding:12px 13px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
+  .title{font-weight:650;font-size:15px;line-height:1.25}
+  .orig{color:var(--muted);font-size:12px}
+  .meta{color:var(--muted);font-size:12px}
+  .desc{font-size:13px;color:#c8ced8;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+  .empty{color:var(--muted);text-align:center;padding:60px 0}
+  footer{max-width:1400px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:12px}
+  footer a{color:var(--muted)}
+
+  /* Detailansicht */
+  .overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.72);display:none;overflow-y:auto;padding:30px 16px}
+  .overlay.open{display:block}
+  .sheet{position:relative;max-width:960px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .close{position:absolute;top:12px;right:12px;z-index:3;width:38px;height:38px;border-radius:50%;border:none;background:rgba(0,0,0,.6);color:#fff;font-size:20px;cursor:pointer}
+  .back{position:absolute;top:12px;left:12px;z-index:3;border:none;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;padding:8px 14px;cursor:pointer}
+  .hero{position:relative;padding:60px 26px 24px;background:#1b1f27 center/cover no-repeat}
+  .hero::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(23,26,33,.55),var(--panel) 92%)}
+  .hero-in{position:relative;display:flex;gap:22px;align-items:flex-end;flex-wrap:wrap}
+  .hero-poster{width:170px;aspect-ratio:2/3;border-radius:10px;overflow:hidden;position:relative;flex:0 0 auto;box-shadow:0 10px 30px rgba(0,0,0,.5);background:#222}
+  .hero-poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .hero-poster .ph{font-size:16px}
+  .hero-txt{flex:1 1 300px;min-width:0}
+  .hero-txt h2{margin:0 0 4px;font-size:28px;line-height:1.15}
+  .facts{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .fact{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:13px}
+  .fact.star{color:var(--accent)}
+  .tagline{color:var(--muted);font-style:italic;margin:4px 0}
+  .sec{padding:4px 26px 22px}
+  .sec h3{font-size:16px;margin:14px 0 10px}
+  .overview{margin:0;color:#d5dae2;max-width:75ch}
+  .note{color:var(--muted);font-size:13px;margin-top:8px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .seasons{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+  .season{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:13px}
+  .season b{display:block;font-size:14px}
+  .cast{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:12px}
+  .person{background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;padding:0;transition:border-color .15s}
+  .person:hover{border-color:var(--accent)}
+  .person .pic{aspect-ratio:2/3;background:#2a2f3a center/cover no-repeat;position:relative}
+  .person .pic span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#5d6676}
+  .person .pn{padding:7px 8px 2px;font-size:13px;font-weight:600;line-height:1.2}
+  .person .pr{padding:0 8px 8px;font-size:12px;color:var(--muted);line-height:1.25}
+  .person .inlist{display:inline-block;margin:0 8px 8px;font-size:11px;background:var(--accent);color:#111;border-radius:999px;padding:1px 7px;font-weight:700}
+  .mini{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+  .mini .card .body{padding:8px 9px 10px;gap:2px}
+  .mini .card .title{font-size:13px}
+  .mini .card .ph{font-size:14px;padding:10px}
+  .why{font-size:11px;color:var(--muted)}
+  .hint{background:var(--panel2);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;color:var(--muted);font-size:13px}
+  .provider{display:inline-flex;align-items:center;gap:6px}
+  .provider img{width:20px;height:20px;border-radius:5px}
+
+  .addwrap{position:relative;flex:1 1 240px;min-width:200px}
+  .addwrap .search{width:100%;border-style:dashed}
+  .addres{position:absolute;top:calc(100% + 6px);left:0;right:0;min-width:320px;max-height:70vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.6);z-index:30;display:none}
+  .addres.open{display:block}
+  .hit{display:flex;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .hit:last-child{border-bottom:none}
+  .hit .hp{width:46px;aspect-ratio:2/3;border-radius:6px;background:#2a2f3a center/cover no-repeat;flex:0 0 auto}
+  .hit .ht{flex:1;min-width:0}
+  .hit .ht b{display:block;font-size:14px;line-height:1.25}
+  .hit .ht span{font-size:12px;color:var(--muted)}
+  .hit .btn{padding:6px 12px;font-size:13px;white-space:nowrap}
+  .hit .inl{font-size:12px;color:var(--ok);white-space:nowrap}
+  .addmsg{padding:12px 14px;color:var(--muted);font-size:13px}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#232833;border:1px solid var(--line);color:var(--text);padding:10px 16px;border-radius:999px;z-index:100;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none;max-width:92vw}
+  .toast.show{display:block}
+  .danger{color:#ff8a8a}
+  dialog h3{font-size:15px;margin:16px 0 6px}
+  dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:var(--radius);max-width:460px;width:92vw;padding:22px}
+  dialog::backdrop{background:rgba(0,0,0,.6)}
+  dialog h2{margin:0 0 8px;font-size:18px}
+  dialog p{color:var(--muted);font-size:13px;margin:6px 0 14px}
+  dialog input,dialog select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+  dialog label{font-size:13px;color:var(--muted)}
+  .row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .primary{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
+  .status{font-size:12px;color:var(--muted);min-height:1em;margin-bottom:8px}
+  @media (max-width:600px){
+    .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+    .counts{margin-left:0;width:100%}
+    .overlay{padding:0}
+    .sheet{border-radius:0;min-height:100%;border:none}
+    .hero{padding:58px 16px 18px}.sec{padding:4px 16px 20px}
+    .hero-poster{width:120px}.hero-txt h2{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>Watch<span>list</span></h1>
+    <input id="q" class="search" type="search" placeholder="In meiner Liste suchen …" autocomplete="off">
+    <div class="addwrap">
+      <input id="addq" class="search" type="search" placeholder="＋ Neuen Titel bei TMDB suchen …" autocomplete="off">
+      <div class="addres" id="addres"></div>
+    </div>
+    <div class="chips" id="typeChips">
+      <button class="chip on" data-type="">Alle</button>
+      <button class="chip" data-type="Film">Filme</button>
+      <button class="chip" data-type="Serie">Serien</button>
+    </div>
+    <select id="genre"><option value="">Alle Genres</option></select>
+    <select id="stream"><option value="">Alle Dienste</option></select>
+    <select id="sort">
+      <option value="title">A–Z</option>
+      <option value="yearDesc">Neueste zuerst</option>
+      <option value="yearAsc">Älteste zuerst</option>
+      <option value="rating">Beste Bewertung</option>
+    </select>
+    <label class="toggle"><input type="checkbox" id="unseen"> nur ungesehen</label>
+    <button class="btn" id="settingsBtn" title="Einstellungen">⚙︎ TMDB</button>
+    <div class="counts"><span class="count" id="count"></span><span class="count" id="loadStatus"></span></div>
+  </div>
+</header>
+
+<main>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>Nichts gefunden.</div>
+</main>
+
+<footer>
+  Titeldaten, Besetzung und Plakate: <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB.
+  Streaming-Angaben: <a href="https://www.justwatch.com/" target="_blank" rel="noopener">JustWatch</a> (über TMDB).
+</footer>
+
+<div class="toast" id="toast"></div>
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+
+<dialog id="settings">
+  <h2>TMDB-Einstellungen</h2>
+  <p>Trag hier deinen TMDB-API-Schlüssel (v3, der kurze) ein. Er wird nur in diesem Browser gespeichert und nicht mit der Seite veröffentlicht.</p>
+  <input id="keyInput" type="password" placeholder="API-Schlüssel" autocomplete="off">
+  <label for="regionSel">Streaming-Angebote für</label>
+  <select id="regionSel">
+    <option value="DE">Deutschland</option>
+    <option value="AT">Österreich</option>
+    <option value="CH">Schweiz</option>
+  </select>
+  <h3>GitHub (Liste speichern)</h3>
+  <p>Damit hinzugefügte Titel und der Gesehen-Haken auf allen Geräten landen. Schlüssel bleibt nur in diesem Browser.</p>
+  <input id="ghRepo" type="text" placeholder="benutzername/watchlist" autocomplete="off">
+  <input id="ghToken" type="password" placeholder="GitHub-Zugangsschlüssel (github_pat_…)" autocomplete="off">
+  <div class="status" id="keyStatus"></div>
+  <div class="row" style="justify-content:flex-start;margin-bottom:10px">
+    <button class="btn" id="exportCsv">Liste als CSV herunterladen</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="clearCache">TMDB neu laden</button>
+    <button class="btn" id="closeSettings">Abbrechen</button>
+    <button class="btn primary" id="saveKey">Speichern</button>
+  </div>
+</dialog>
+
+<script>
+/* Fallback-Daten, falls filme.csv nicht geladen werden kann (z. B. beim lokalen Öffnen). */
+const FALLBACK_CSV = "Titel,Englischer Titel,Streaming (DE),Typ,Jahr,Genre,Gesehen,Bewertung,Notiz,Suchbegriff,Link,Beschreibung\n(500) Days of Summer,(500) Days of Summer,prüfen,Film,2009,Romantische Komödie,FALSE,,,500 days of summer,https://www.google.com/search?q=500+days+of+summer,\"Tom erzählt nicht chronologisch die 500 Tage seiner Beziehung zu Summer, die nicht an die große Liebe glaubt.\"\n\"10 Dinge, die ich an dir hasse\",10 Things I Hate About You,prüfen,Film,1999,Teenie-Komödie,FALSE,,,10 things i hate about you,https://www.google.com/search?q=10+things+i+hate+about+you,\"Moderne High-School-Version von Shakespeares „Der Widerspenstigen Zähmung“: Ein Außenseiter wird dafür bezahlt, die schroffe Kat zu daten.\"\n12 12 12,12 12 12,prüfen,Film,2026,\"Thriller, Heist\",FALSE,,,12 12 12,https://www.imdb.com/de/title/tt32375763/,\"Ein Profi-Einbrecher und sein Partner spähen eine schwer gesicherte Züricher Bank aus. Fehlalarme einer vorgetäuschten Baustelle machen die Wachen nachlässig, und eine Insiderin schleust russisches Mafiageld in den Tresor.\"\n12 Monkeys,12 Monkeys,prüfen,Film,1995,Sci-Fi,FALSE,,,12 monkeys,https://www.google.com/search?q=12+monkeys,\"Ein Häftling wird aus einer verseuchten Zukunft in die 90er geschickt, um den Ursprung eines tödlichen Virus aufzuspüren.\"\n1984,1984,prüfen,Film,1984,\"Sci-Fi, Drama\",FALSE,,Orwell-Verfilmung,1984,https://www.google.com/search?q=1984,Verfilmung von Orwells Roman: Winston Smith lehnt sich im Überwachungsstaat von Big Brother heimlich auf – und verliebt sich.\n1992,1992,prüfen,Film,2024,\"Action, Thriller\",FALSE,,,1992 film,https://www.google.com/search?q=1992+film,\"Während der Unruhen 1992 in Los Angeles versucht ein Vater, aus dem Verbrechen auszusteigen, während andere einen Raubzug planen.\"\n25 Stunden (25th Hour),25th Hour,prüfen,Film,2002,Drama,FALSE,,,25th hour,https://www.google.com/search?q=25th+hour,\"Ein Drogendealer verbringt seinen letzten Tag in Freiheit in New York, bevor er für sieben Jahre ins Gefängnis muss.\"\n2nd Chance,2nd Chance,prüfen,Film,2022,Doku,FALSE,,Doku über Richard Davis,2ne chance richard davis film,https://www.google.com/search?q=2ne+chance+richard+davis+film,\"Dokumentarfilm über Richard Davis, den Erfinder der modernen kugelsicheren Weste, der sich für Werbezwecke selbst anschoss.\"\nAlles Geld der Welt,All the Money in the World,prüfen,Film,2017,\"Krimi, Drama\",FALSE,,,all the money in the world,https://www.google.com/search?q=all+the+money+in+the+world,\"1973 wird der Enkel des reichsten Mannes der Welt entführt – doch J. Paul Getty weigert sich, das Lösegeld zu zahlen.\"\nAlles Routine (Office Space),Office Space,prüfen,Film,1999,Komödie,FALSE,,,office space,https://www.google.com/search?q=office+space,\"Ein frustrierter Büroangestellter hört auf, sich um seinen öden Job zu kümmern – und plant mit Kollegen einen Betrug an der Firma.\"\nApollo 10½,Apollo 10½,Netflix,Film,2022,Animation,FALSE,,,apollo 10 1/2,https://www.google.com/search?q=apollo+10+1/2,\"Animierte Erinnerung von Richard Linklater an eine Kindheit in Houston 1969, rund um die Mondlandung.\"\nArbitrage – Macht der Begierde,Arbitrage,prüfen,Film,2012,\"Thriller, Drama\",FALSE,,,arbitrage film,https://www.google.com/search?q=arbitrage+film,\"Ein Hedgefonds-Milliardär versucht kurz vor dem Verkauf seiner Firma, einen Betrug und einen tödlichen Unfall zu vertuschen.\"\nAuslöschung (Annihilation),Annihilation,prüfen,Film,2018,\"Sci-Fi, Horror\",FALSE,,,Annihilation,https://www.google.com/search?q=Annihilation,\"Eine Biologin führt ein Team in eine abgeriegelte Zone, in der eine fremde Kraft die Natur verändert.\"\nAutomata,Automata,prüfen,Film,2014,Sci-Fi,FALSE,,,automata,https://www.google.com/search?q=automata,\"In einer verwüsteten Zukunft entdeckt ein Versicherungsermittler, dass Roboter beginnen, ihre Programmierung zu umgehen.\"\nAviator,The Aviator,prüfen,Film,2004,\"Biografie, Drama\",FALSE,,,the aviator,https://www.google.com/search?q=the+aviator,\"Martin Scorsese über Howard Hughes: Flugpionier, Filmproduzent und Exzentriker, zunehmend gefangen in seinen Zwängen.\"\nThe Batman,The Batman,prüfen,Film,2022,\"Action, Krimi, Superhelden\",FALSE,,,batman (film),https://www.google.com/search?q=batman+(film),\"Batman jagt in seinem zweiten Jahr als Rächer den Riddler, der Gothams Elite ermordet und dunkle Geheimnisse aufdeckt.\"\nBeim ersten Mal (Knocked Up),Knocked Up,prüfen,Film,2007,Komödie,FALSE,,,knocked up,https://www.google.com/search?q=knocked+up,Nach einem One-Night-Stand wird eine aufstrebende TV-Journalistin schwanger – vom planlosen Kiffer Ben.\nBeim Leben meiner Schwester,My Sister's Keeper,prüfen,Film,2009,Drama,FALSE,,,my sister keeper,https://www.google.com/search?q=my+sister+keeper,\"Ein Mädchen, das als Spenderin für ihre krebskranke Schwester gezeugt wurde, verklagt ihre Eltern auf das Recht über ihren Körper.\"\nBlood & Sinners (Sinners),Sinners,prüfen,Film,2025,\"Horror, Drama\",FALSE,,,sinners,https://www.google.com/search?q=sinners,Zwillingsbrüder kehren 1932 in ihre Heimatstadt im Mississippi-Delta zurück und treffen dort auf ein übernatürliches Böses.\nBrothers,Brothers,prüfen,Film,2009,\"Drama, Kriegsfilm\",FALSE,,,Brothers 2009,https://www.google.com/search?q=Brothers+2009,\"Ein Soldat gilt in Afghanistan als tot; als er traumatisiert zurückkehrt, hat sich sein Bruder seiner Familie angenähert.\"\nBurn After Reading,Burn After Reading,prüfen,Film,2008,\"Komödie, Krimi\",FALSE,,,burn after reading,https://www.google.com/search?q=burn+after+reading,Coen-Komödie: Zwei Fitnessstudio-Angestellte finden eine CD mit Memoiren eines CIA-Analysten und wollen ihn erpressen.\nBy Any Means,By Any Means,prüfen,Film,2026,\"Action, Krimi, Thriller\",FALSE,,,by any means film,https://www.imdb.com/de/title/tt34379051/,\"Action-Thriller von 2026; eine Beschreibung ergänzen wir, sobald mehr dazu bekannt ist.\"\nCapone,Capone,prüfen,Film,2020,\"Krimi, Drama\",FALSE,,,capone 2020,https://www.google.com/search?q=capone+2020,\"Das letzte Lebensjahr von Al Capone: Nach dem Gefängnis von Demenz gezeichnet, verfolgen ihn Erinnerungen an seine Vergangenheit.\"\nChildren of Men,Children of Men,prüfen,Film,2006,\"Sci-Fi, Drama\",FALSE,,,children of men,https://www.google.com/search?q=children+of+men,2027 sind seit Jahren keine Kinder mehr geboren worden – bis ein Mann eine schwangere junge Frau in Sicherheit bringen soll.\nCitizen Vigilante,Citizen Vigilante,prüfen,Film,2026,\"Action, Thriller\",FALSE,,\"Uwe Boll, mit Armie Hammer\",citizen vigilante,https://www.google.com/search?q=citizen+vigilante,Uwe-Boll-Film mit Armie Hammer: Ein reicher Amerikaner in Europa wird zum Selbstjustiz-Rächer. Kontrovers aufgenommen.\nCompany Men,The Company Men,prüfen,Film,2010,Drama,FALSE,,,the company men,https://www.google.com/search?q=the+company+men,In der Finanzkrise verlieren drei Manager eines Konzerns ihre Jobs und müssen ihr Leben neu sortieren.\nCruella,Cruella,Disney+,Film,2021,Krimi-Komödie,FALSE,,,cruella,https://www.google.com/search?q=cruella,Vorgeschichte der „101 Dalmatiner“-Schurkin: Die junge Estella kämpft sich im London der 70er in die Modewelt.\nDaddio,Daddio,prüfen,Film,2023,Drama,FALSE,,,daddio,https://www.google.com/search?q=daddio,\"Eine Frau fährt nachts vom Flughafen JFK in Manhattan, und das Gespräch mit dem Taxifahrer wird immer persönlicher.\"\nDas Mercury Puzzle,Mercury Rising,prüfen,Film,1998,\"Action, Thriller\",FALSE,,,mercury rising,https://www.google.com/search?q=mercury+rising,\"Ein FBI-Agent beschützt einen autistischen Jungen, der versehentlich einen streng geheimen Regierungscode geknackt hat.\"\nDas perfekte Verbrechen (Fracture),Fracture,prüfen,Film,2007,Justizthriller,FALSE,,,fracture,https://www.google.com/search?q=fracture,Ein Ingenieur schießt auf seine untreue Frau und spielt dann ein Katz-und-Maus-Spiel mit einem ehrgeizigen Staatsanwalt.\nDas Schicksal ist ein mieser Verräter,The Fault in Our Stars,prüfen,Film,2014,\"Drama, Romantik\",FALSE,,,the fault in our stars,https://www.google.com/search?q=the+fault+in+our+stars,\"Zwei krebskranke Teenager verlieben sich und reisen nach Amsterdam, um ihren Lieblingsautor zu treffen.\"\nDas schnelle Geld (Two for the Money),Two for the Money,prüfen,Film,2005,\"Drama, Thriller\",FALSE,,,two for the money,https://www.google.com/search?q=two+for+the+money,Ein ehemaliger Footballspieler wird zum Star-Tipper für Sportwetten unter den Fittichen eines charismatischen Zockers.\nDeep Water,Deep Water,Prime Video,Film,2022,Erotikthriller,FALSE,,,deep water,https://www.google.com/search?q=deep+water,\"Ein Ehepaar führt eine offene Ehe, bis die Liebhaber der Frau nach und nach verschwinden.\"\nDelisted,Delisted,prüfen,Film,2026,\"Kurzfilm, Drama\",FALSE,,,delisted film,https://www.imdb.com/de/title/tt46663682/,\"Kurzfilm (Drama) von 2026; eine Beschreibung ergänzen wir, sobald mehr dazu bekannt ist.\"\nDer Astronaut (Project Hail Mary),Project Hail Mary,prüfen,Film,2026,Sci-Fi,FALSE,,,project hail mary,https://www.google.com/search?q=project+hail+mary,Ein Lehrer wacht ohne Erinnerung auf einem Raumschiff fern der Erde auf – und soll die Menschheit vor dem Erlöschen der Sonne retten.\nDer Kautions-Cop (The Bounty Hunter),The Bounty Hunter,prüfen,Film,2010,Action-Komödie,FALSE,,,kautionscop,https://www.google.com/search?q=kautionscop,\"Ein Kopfgeldjäger soll seine Ex-Frau festnehmen, die ihre Kaution hat platzen lassen – und beide geraten in einen Mordfall.\"\nDer Mandant,The Lincoln Lawyer,prüfen,Film,2011,Justizthriller,FALSE,,,the lincoln lawyer,https://www.google.com/search?q=the+lincoln+lawyer,\"Ein Anwalt, der seine Kanzlei vom Rücksitz seines Lincolns aus führt, verteidigt einen reichen Klienten mit dunklem Geheimnis.\"\nDer Plan (The Adjustment Bureau),The Adjustment Bureau,prüfen,Film,2011,\"Sci-Fi, Romantik\",FALSE,,,the adjustment bureau,https://www.google.com/search?q=the+adjustment+bureau,\"Ein Politiker verliebt sich in eine Tänzerin, doch geheimnisvolle Männer wollen verhindern, dass sie zusammenkommen.\"\nDer talentierte Mr. Ripley,The Talented Mr. Ripley,prüfen,Film,1999,Thriller,FALSE,,,the talented mr ripley,https://www.google.com/search?q=the+talented+mr+ripley,Im Italien der 50er schleicht sich Tom Ripley in das Leben eines reichen Playboys – mit tödlichen Folgen.\nDie etwas anderen Cops,The Other Guys,prüfen,Film,2010,Action-Komödie,FALSE,,,the other guys,https://www.google.com/search?q=the+other+guys,Zwei Schreibtisch-Cops in New York wollen endlich echte Fälle lösen und stolpern über einen großen Finanzbetrug.\nDie üblichen Verdächtigen,The Usual Suspects,prüfen,Film,1995,\"Krimi, Thriller\",FALSE,,,the usual suspects,https://www.google.com/search?q=the+usual+suspects,\"Fünf Kriminelle aus einer Gegenüberstellung – und die Frage, wer der legendäre Keyser Söze ist.\"\nDogma,Dogma,prüfen,Film,1999,\"Komödie, Fantasy\",FALSE,,,dogman 1999,https://www.imdb.com/de/title/tt0120655/,\"Zwei gefallene Engel finden ein Schlupfloch, um in den Himmel zurückzukehren, was die ganze Existenz auslöschen würde.\"\nDon Jon,Don Jon,prüfen,Film,2013,\"Komödie, Drama\",FALSE,,,don jon / don john / don john film,https://www.google.com/search?q=don+jon,\"Ein Frauenheld aus New Jersey, süchtig nach Pornos, sucht in einer Beziehung mit Barbara die perfekte Liebe.\"\nDon't Move,Don't Move,Netflix,Film,2024,Thriller,FALSE,,,don't move,https://www.google.com/search?q=don't+move,\"Eine trauernde Frau wird von einem Mörder mit einer lähmenden Droge betäubt und muss fliehen, bevor ihr Körper versagt.\"\nDon't Worry Darling,Don't Worry Darling,prüfen,Film,2022,Psychothriller,FALSE,,,don't worry darling,https://www.google.com/search?q=don't+worry+darling,\"Eine Hausfrau in einer perfekten 50er-Jahre-Siedlung merkt, dass hinter der Idylle etwas Unheimliches steckt.\"\nDoom,Doom,prüfen,Film,2005,\"Sci-Fi, Action\",FALSE,,,doom 2005,https://www.google.com/search?q=doom+2005,\"Ein Marine-Trupp wird zu einer Forschungsstation auf dem Mars geschickt, wo Experimente Monster hervorgebracht haben.\"\nDust Bunny,Dust Bunny,prüfen,Film,2025,\"Horror, Fantasy\",FALSE,,,dustbunny,https://www.google.com/search?q=dustbunny,\"Ein Mädchen bittet ihren Nachbarn, einen Auftragskiller, das Monster unter ihrem Bett zu töten.\"\nEin Chef zum Verlieben (Two Weeks Notice),Two Weeks Notice,prüfen,Film,2002,Romantische Komödie,FALSE,,,two weeks notice,https://www.google.com/search?q=two+weeks+notice,Eine Anwältin kündigt bei ihrem charmant-chaotischen Chef und soll ihre Nachfolgerin einarbeiten.\nEinfach zu haben (Easy A),Easy A,prüfen,Film,2010,Teenie-Komödie,FALSE,,,easy a,https://www.google.com/search?q=easy+a,\"Eine Schülerin nutzt ein falsches Gerücht über sich, um ihren Status zu steigern – frei nach „Der scharlachrote Buchstabe“.\"\nEnemy,Enemy,prüfen,Film,2013,Psychothriller,FALSE,,,enemy,https://www.google.com/search?q=enemy,\"Ein Geschichtsdozent entdeckt einen Schauspieler, der ihm aufs Haar gleicht, und wird von dieser Doppelgänger-Begegnung besessen.\"\nEquilibrium,Equilibrium,prüfen,Film,2002,\"Sci-Fi, Action\",FALSE,,,equilibrium,https://www.google.com/search?q=equilibrium,\"In einer Zukunft, in der Gefühle per Medikament unterdrückt werden, setzt ein Elite-Polizist seine Dosis ab.\"\nErin Brockovich,Erin Brockovich,prüfen,Film,2000,Drama,FALSE,,,erin brockovich,https://www.google.com/search?q=erin+brockovich,Eine alleinerziehende Mutter ohne Jurastudium deckt einen Umweltskandal auf und verklagt einen Energiekonzern.\nEvent Horizon,Event Horizon,prüfen,Film,1997,\"Sci-Fi, Horror\",FALSE,,,event horizon,https://www.google.com/search?q=event+horizon,\"Ein Rettungsteam findet ein verschollenes Raumschiff, das von einer Reise durch ein schwarzes Loch etwas Böses mitgebracht hat.\"\nEyes Wide Shut,Eyes Wide Shut,prüfen,Film,1999,\"Drama, Thriller\",FALSE,,,eyes wide shut,https://www.google.com/search?q=eyes+wide+shut,Nach dem Geständnis seiner Frau irrt ein New Yorker Arzt durch eine Nacht und gerät in eine geheime Gesellschaft.\nF1,F1,Apple TV+,Film,2025,\"Sport, Drama\",FALSE,,,f1 film,https://www.google.com/search?q=f1+film,\"Ein abgehalfterter Formel-1-Pilot kehrt zurück, um ein Team zu retten und einen jungen Fahrer zu betreuen.\"\nFlamin' Hot,Flamin' Hot,Disney+,Film,2023,\"Biografie, Komödie\",FALSE,,,flamin hot,https://www.google.com/search?q=flamin+hot,\"Die Geschichte eines Hausmeisters bei Frito-Lay, der behauptet, die Idee zu den scharfen Flamin' Hot Cheetos gehabt zu haben.\"\nGhosted,Ghosted,Apple TV+,Film,2023,Action-Komödie,FALSE,,,ghosted,https://www.google.com/search?q=ghosted,\"Ein Farmer verliebt sich in eine Frau, die sich als Geheimagentin entpuppt – und wird in ihre Mission hineingezogen.\"\nGone Girl,Gone Girl,prüfen,Film,2014,Thriller,FALSE,,,gone girl,https://www.google.com/search?q=gone+girl,\"Am fünften Hochzeitstag verschwindet Amy spurlos, und ihr Mann gerät unter Verdacht.\"\nGreenland,Greenland,prüfen,Film,2020,\"Katastrophe, Action\",FALSE,,,greenland,https://www.google.com/search?q=greenland,\"Ein Komet bedroht die Erde, und eine Familie kämpft sich zu einem rettenden Bunker in Grönland durch.\"\nHeretic,Heretic,prüfen,Film,2024,Horror,FALSE,,,heretic,https://www.google.com/search?q=heretic,\"Zwei junge Missionarinnen klopfen an die Tür eines Mannes, der sie in ein tödliches Glaubensspiel verwickelt.\"\nHitman – Jeder stirbt alleine,Hitman,prüfen,Film,2007,\"Action, Krimi, Thriller\",FALSE,,,hitman,https://www.imdb.com/de/title/tt0465494/,\"Agent 47, ein genetisch gezüchteter Auftragskiller, wird nach einem Auftrag in Russland selbst zur Zielscheibe.\"\nHomestead,Homestead,prüfen,Film,2024,\"Drama, Thriller\",FALSE,,,homestead,https://www.google.com/search?q=homestead,Nach einem Anschlag auf die USA sucht ein Ex-Soldat Schutz in einer abgeschotteten Prepper-Gemeinschaft.\nHooligans (Green Street),Green Street Hooligans,prüfen,Film,2005,\"Drama, Krimi\",FALSE,,,hooligans film,https://www.google.com/search?q=hooligans+film,Ein aus Harvard geflogener Student gerät in London in eine Firma von Fußball-Hooligans.\nImmer Ärger mit 40 (This Is 40),This Is 40,prüfen,Film,2012,Komödie,FALSE,,,this is 40,https://www.google.com/search?q=this+is+40,\"Pete und Debbie aus „Beim ersten Mal“ werden 40 und kämpfen mit Ehe, Kindern und Geldsorgen.\"\nIn meinem Himmel (The Lovely Bones),The Lovely Bones,prüfen,Film,2009,\"Drama, Fantasy\",FALSE,,,lovely bones,https://www.google.com/search?q=lovely+bones,\"Ein ermordetes Mädchen beobachtet aus einer Zwischenwelt, wie ihre Familie trauert und ihr Mörder unentdeckt bleibt.\"\nInsomnia – Schlaflos,Insomnia,prüfen,Film,2002,Thriller,FALSE,,,insomnia film,https://www.google.com/search?q=insomnia+film,\"Ein LA-Detective ermittelt in Alaska, wo die Sonne nie untergeht, und gerät in ein Psychospiel mit einem Mörder.\"\nJolt,Jolt,Prime Video,Film,2021,Action-Komödie,FALSE,,,jolt film,https://www.google.com/search?q=jolt+film,\"Eine Frau mit Wutproblemen, die sich per Elektroschock beruhigen muss, jagt den Mörder ihres ersten Dates.\"\nManchester by the Sea,Manchester by the Sea,prüfen,Film,2016,Drama,FALSE,,,manchester by the sea,https://www.google.com/search?q=manchester+by+the+sea,Ein Hausmeister muss nach dem Tod seines Bruders in seine Heimatstadt zurück und Vormund für seinen Neffen werden.\nMickey 17,Mickey 17,prüfen,Film,2025,Sci-Fi,FALSE,,,mickey 17 stream,https://www.google.com/search?q=mickey+17+stream,Ein „Wegwerf“-Klon auf einer Weltraumkolonie wird nach jedem Tod neu gedruckt – bis zwei Versionen gleichzeitig existieren.\nMonuments Men,The Monuments Men,prüfen,Film,2014,\"Kriegsfilm, Drama\",FALSE,,,the monuments men,https://www.google.com/search?q=the+monuments+men,Im Zweiten Weltkrieg sollen Kunstexperten von den Nazis geraubte Meisterwerke retten.\nNightcrawler,Nightcrawler,prüfen,Film,2014,Thriller,FALSE,,,nightcrawler,https://www.google.com/search?q=nightcrawler,Ein skrupelloser Einzelgänger filmt nachts Unfälle und Verbrechen in LA und verkauft die Bilder an TV-Sender.\nNo Way Out – Gegen die Flammen,Only the Brave,prüfen,Film,2017,\"Drama, Action\",FALSE,,,only the brave,https://www.google.com/search?q=only+the+brave,\"Die wahre Geschichte einer Elite-Einheit von Feuerwehrleuten in Arizona, die gegen Waldbrände kämpft.\"\nNotes from the Last Row,Notes from the Last Row,prüfen,Serie,2026,\"Drama, Mystery, Thriller\",FALSE,,,notes for the last row,https://www.imdb.com/de/title/tt36270432/,\"Serie von 2026 (Drama, Mystery, Thriller); eine Beschreibung ergänzen wir, sobald mehr dazu bekannt ist.\"\nNur ein kleiner Gefallen,A Simple Favor,prüfen,Film,2018,\"Thriller, Komödie\",FALSE,,,nur ein kleiner gefallen,https://www.google.com/search?q=nur+ein+kleiner+gefallen,\"Eine Mama-Bloggerin will herausfinden, warum ihre glamouröse Freundin plötzlich verschwunden ist.\"\nPalm Springs,Palm Springs,prüfen,Film,2020,\"Komödie, Romantik\",FALSE,,,palm springs film,https://www.google.com/search?q=palm+springs+film,Zwei Hochzeitsgäste in Palm Springs stecken in einer Zeitschleife fest und erleben denselben Tag immer wieder.\nPeppermint – Angel of Vengeance,Peppermint,prüfen,Film,2018,Action,FALSE,,,peppermint,https://www.google.com/search?q=peppermint,\"Nachdem Mann und Tochter von einem Kartell getötet wurden, nimmt eine Mutter Jahre später blutige Rache.\"\nPer Anhalter durch die Galaxis,The Hitchhiker's Guide to the Galaxy,prüfen,Film,2005,\"Sci-Fi, Komödie\",FALSE,,,marvin hitchhiker's guide to the galaxy,https://www.google.com/search?q=marvin+hitchhiker's+guide+to+the+galaxy,\"Kurz bevor die Erde gesprengt wird, rettet ein Außerirdischer seinen Freund Arthur Dent auf eine absurde Reise durchs All.\"\nPolar,Polar,Netflix,Film,2019,Action,FALSE,,,polar film,https://www.google.com/search?q=polar+film,Ein Auftragskiller kurz vor der Rente wird von seinem eigenen Arbeitgeber gejagt.\nRendezvous mit Joe Black,Meet Joe Black,prüfen,Film,1998,\"Drama, Fantasy\",FALSE,,,meet joe black,https://www.google.com/search?q=meet+joe+black,\"Der Tod nimmt menschliche Gestalt an, um das Leben kennenzulernen, und verliebt sich in die Tochter eines Medienmoguls.\"\nRevolver,Revolver,prüfen,Film,2005,\"Krimi, Thriller\",FALSE,,,revolver film,https://www.google.com/search?q=revolver+film,Guy-Ritchie-Thriller: Ein Glücksspieler kommt aus dem Gefängnis und will sich an einem Casino-Boss rächen.\nRunner,Runner,prüfen,Film,2026,\"Action, Komödie, Thriller\",FALSE,,,runner,https://www.imdb.com/de/title/tt31349844/,\"Action-Komödie von 2026; eine Beschreibung ergänzen wir, sobald mehr dazu bekannt ist.\"\nSchräger als Fiktion,Stranger Than Fiction,prüfen,Film,2006,\"Komödie, Drama\",FALSE,,,stranger than fiction,https://www.google.com/search?q=stranger+than+fiction,\"Ein Steuerbeamter hört eine Erzählerstimme, die seinen bevorstehenden Tod ankündigt.\"\nSelbst ist die Braut (The Proposal),The Proposal,prüfen,Film,2009,Romantische Komödie,FALSE,,,the proposal,https://www.google.com/search?q=the+proposal,Eine Verlagschefin droht ausgewiesen zu werden und zwingt ihren Assistenten zu einer Scheinverlobung.\nSet It Up,Set It Up,Netflix,Film,2018,Romantische Komödie,FALSE,,,set it up,https://www.google.com/search?q=set+it+up,\"Zwei überarbeitete Assistenten verkuppeln ihre Chefs, um mehr Freizeit zu bekommen.\"\nSie leben! (They Live),They Live,prüfen,Film,1988,\"Sci-Fi, Action\",FALSE,,,they live,https://www.google.com/search?q=they+live,\"Ein Arbeiter findet eine Sonnenbrille, die ihm zeigt, dass Außerirdische die Menschheit mit versteckten Botschaften steuern.\"\nStreet Kings,Street Kings,prüfen,Film,2008,\"Krimi, Action\",FALSE,,,street kings,https://www.google.com/search?q=street+kings,Ein LAPD-Detective wird unter Mordverdacht gestellt und entdeckt Korruption in den eigenen Reihen.\nSurrogates – Mein zweites Ich,Surrogates,prüfen,Film,2009,\"Sci-Fi, Action\",FALSE,,,surrogates,https://www.google.com/search?q=surrogates,\"In einer Welt, in der Menschen nur noch Roboter-Stellvertreter nach draußen schicken, ermittelt ein FBI-Agent in einem Mord.\"\nTage des Donners,Days of Thunder,prüfen,Film,1990,\"Action, Sport\",FALSE,,,days of thunder,https://www.google.com/search?q=days+of+thunder,Ein junger Rennfahrer stürmt in die NASCAR-Serie und muss mit seinem Ehrgeiz und einem Unfall klarkommen.\nThe Black Phone,The Black Phone,prüfen,Film,2021,Horror,FALSE,,,black phone,https://www.google.com/search?q=black+phone,Ein entführter Junge empfängt in seinem Kellerverlies Anrufe von den früheren Opfern seines Entführers.\nThe Counselor,The Counselor,prüfen,Film,2013,\"Thriller, Krimi\",FALSE,,,the counselor,https://www.google.com/search?q=the+counselor,\"Ein Anwalt steigt in einen Drogendeal ein und verliert die Kontrolle, als die Lieferung verloren geht.\"\nThe Gambler,The Gambler,prüfen,Film,2014,\"Krimi, Drama\",FALSE,,,the gambler,https://www.google.com/search?q=the+gambler,Ein Literaturprofessor mit Spielsucht leiht sich Geld von Gangstern und setzt alles aufs Spiel.\nThe Gorge,The Gorge,Apple TV+,Film,2025,\"Sci-Fi, Action\",FALSE,,,the gorge / film mit tiefer schlucht,https://www.google.com/search?q=the+gorge,\"Zwei Scharfschützen bewachen von gegenüberliegenden Türmen eine geheimnisvolle Schlucht, aus der etwas Gefährliches kommt.\"\nThe Gray Man,The Gray Man,Netflix,Film,2022,Action,FALSE,,,the gray man,https://www.google.com/search?q=the+gray+man,Ein CIA-Agent findet belastende Geheimnisse über seine Behörde und wird von einem Söldner um die Welt gejagt.\nThe Last Song,The Last Song,prüfen,Film,2010,\"Drama, Romantik\",FALSE,,,my last song movie,https://www.google.com/search?q=my+last+song+movie,Eine rebellische Teenagerin verbringt den Sommer bei ihrem Vater am Meer und findet über die Musik wieder zu ihm.\nThe Last Stand,The Last Stand,prüfen,Film,2013,Action,FALSE,,,last stand,https://www.google.com/search?q=last+stand,\"Ein Sheriff in einer Kleinstadt stellt sich einem flüchtigen Kartellboss, der Richtung Mexiko rast.\"\nThe Last Stand of Ellen Cole,The Last Stand of Ellen Cole,prüfen,Film,2024,\"Action, Western\",FALSE,,,the last stand of ellen cole,https://www.imdb.com/de/title/tt15682498/,\"Western von 2024; eine Beschreibung ergänzen wir, sobald mehr dazu bekannt ist.\"\nThe Man from Earth,The Man from Earth,prüfen,Film,2007,\"Sci-Fi, Drama\",FALSE,,,the man from earth,https://www.google.com/search?q=the+man+from+earth,\"Bei seinem Abschied erzählt ein Professor seinen Kollegen, er sei 14.000 Jahre alt – fast nur ein Gespräch, aber fesselnd.\"\nThe Only Living Pickpocket in New York,The Only Living Pickpocket in New York,prüfen,Film,2024,Drama,FALSE,,,the only living pickpocket in new york,https://www.google.com/search?q=the+only+living+pickpocket+in+new+york,Ein alternder Taschendieb in New York bestiehlt den falschen Mann und muss sich aus der Klemme ziehen.\nThe Secret – Das Geheimnis,The Secret: Dare to Dream,prüfen,Film,2020,\"Drama, Romantik\",FALSE,,,dare to dream,https://www.imdb.com/de/title/tt4411584/,\"Ein charismatischer Fremder taucht im Leben einer verwitweten Mutter auf und bringt Hoffnung, aber auch ein Geheimnis mit.\"\nThe Tax Collector,The Tax Collector,prüfen,Film,2020,\"Krimi, Action\",FALSE,,,the tax collector,https://www.google.com/search?q=the+tax+collector,\"Ein Geldeintreiber für einen Gangsterboss in LA gerät zwischen die Fronten, als ein Rivale auftaucht.\"\nThe Tourist,The Tourist,prüfen,Film,2010,Thriller,FALSE,,,the tourist,https://www.google.com/search?q=the+tourist,Ein Amerikaner auf Reisen in Venedig wird von einer geheimnisvollen Frau in eine gefährliche Verwechslung gezogen.\nTimeless Love,Timeless Love,prüfen,Film,2019,\"Drama, Romantik (TV-Film)\",FALSE,,,timeless love,https://www.imdb.com/de/title/tt9702698/,TV-Film: Eine Frau erwacht aus dem Koma und ihr Ehemann hat nie existiert – bis sie ihn in der Realität trifft.\nTurn Me On,Turn Me On,prüfen,Film,2024,\"Sci-Fi, Drama\",FALSE,,,turn me on film 2024,https://www.google.com/search?q=turn+me+on+film+2024,\"In einer Gesellschaft, in der alle eine Pille gegen Gefühle nehmen, setzt eine junge Frau sie ab.\"\nUnder the Silver Lake,Under the Silver Lake,prüfen,Film,2018,Neo-Noir,FALSE,,,under the silver lake,https://www.google.com/search?q=under+the+silver+lake,Ein zielloser Mann in LA sucht seine verschwundene Nachbarin und stößt auf eine Verschwörung voller Codes.\nUnthinkable – Der Preis der Wahrheit,Unthinkable,prüfen,Film,2010,Thriller,FALSE,,,unthinkable,https://www.google.com/search?q=unthinkable,Ein Ex-Soldat hat drei Atombomben in US-Städten versteckt; ein Verhörspezialist soll ihn zum Reden bringen.\nUp in the Air,Up in the Air,prüfen,Film,2009,\"Drama, Komödie\",FALSE,,,up in the air,https://www.google.com/search?q=up+in+the+air,\"Ein Manager, der beruflich Leute entlässt und fast nur im Flugzeug lebt, soll eine junge Kollegin einarbeiten.\"\nVielleicht lieber morgen,The Perks of Being a Wallflower,prüfen,Film,2012,Drama,FALSE,,,the perks of being a wallflower,https://www.google.com/search?q=the+perks+of+being+a+wallflower,\"Ein schüchterner Teenager findet in der High School zwei Außenseiter-Freunde, die ihm die Welt zeigen.\"\nWarrior,Warrior,prüfen,Film,2011,Sportdrama,FALSE,,,warrior,https://www.imdb.com/de/title/tt1291584/,Zwei entfremdete Brüder treten bei einem großen Mixed-Martial-Arts-Turnier gegeneinander an.\nWhen the Game Stands Tall,When the Game Stands Tall,prüfen,Film,2014,Sportdrama,FALSE,,,when the game stands tall,https://www.google.com/search?q=when+the+game+stands+tall,Ein High-School-Footballteam mit legendärer Siegesserie muss nach einem Rückschlag wieder zusammenfinden.\nWie ausgewechselt (The Change-Up),The Change-Up,prüfen,Film,2011,Komödie,FALSE,,,the change up,https://www.google.com/search?q=the+change+up,Ein Familienvater und sein Single-Kumpel tauschen nach einem Wunsch ihre Körper.\nWie bringt man seine Frau um?,How to Murder Your Wife,prüfen,Film,1965,Komödie,FALSE,,,how to murder your wife 1965,https://www.google.com/search?q=how+to+murder+your+wife+1965,\"Ein überzeugter Junggeselle wacht nach einer Party verheiratet auf und malt sich aus, seine Frau loszuwerden.\"\nWo die Lüge hinfällt (Anyone but You),Anyone but You,prüfen,Film,2023,Romantische Komödie,FALSE,,,anyone but you,https://www.google.com/search?q=anyone+but+you,\"Zwei, die sich nicht ausstehen können, spielen auf einer Hochzeit in Australien ein Paar.\"\nWolfs,Wolfs,Apple TV+,Film,2024,Action-Komödie,FALSE,,,wolfs,https://www.google.com/search?q=wolfs,Zwei einsame Problemlöser werden für denselben Auftrag gerufen und müssen widerwillig zusammenarbeiten.\nZimmer 1408,1408,prüfen,Film,2007,Horror,FALSE,,,room 1408,https://www.google.com/search?q=room+1408,\"Ein skeptischer Autor übernachtet in einem Hotelzimmer, in dem schon Dutzende Menschen gestorben sind.\"\nZodiac – Die Spur des Killers,Zodiac,prüfen,Film,2007,\"Krimi, Thriller\",FALSE,,,zodiac,https://www.google.com/search?q=zodiac,\"Ein Karikaturist und zwei Ermittler jagen jahrelang den Zodiac-Killer, der San Francisco terrorisierte.\"\nÆon Flux,Æon Flux,prüfen,Film,2005,\"Sci-Fi, Action\",FALSE,,,aeon flux,https://www.google.com/search?q=aeon+flux,In einer abgeschotteten Stadt der Zukunft soll eine Rebellin den Regierungschef töten.\nJames Gandolfini (Schauspieler),,,Person,,,FALSE,,,james gandolfini,https://www.google.com/search?q=james+gandolfini,\"Schauspieler, bekannt als Tony Soprano – gespeichert als Person, um seine Filme anzuschauen.\"\nRuby Rose (Schauspielerin),,,Person,,,FALSE,,,filme und serien von ruby rose,https://www.google.com/search?q=filme+und+serien+von+ruby+rose,\"Schauspielerin, u. a. aus „Orange Is the New Black“ und „Batwoman“ – gespeichert als Person.\"\nA.P. Bio,A.P. Bio,prüfen,Serie,2018,Comedy,FALSE,,,ap bio,https://www.google.com/search?q=ap+bio,Ein gescheiterter Philosophieprofessor muss an einer High School Biologie unterrichten und nutzt die Schüler für eigene Pläne.\nBarry,Barry,HBO Max,Serie,2018,\"Dark Comedy, Krimi\",FALSE,,,barry,https://www.google.com/search?q=barry,Ein Auftragskiller entdeckt in einem Schauspielkurs in LA seine Leidenschaft und will aussteigen.\nBloodhounds,Bloodhounds,Netflix,Serie,2023,\"Action, Krimi\",FALSE,,Koreanische Netflix-Serie,bloodhounds,https://www.google.com/search?q=bloodhounds,Zwei junge Boxer legen sich mit einem skrupellosen Kredithai an.\nDer Untergang des Hauses Usher,The Fall of the House of Usher,Netflix,Serie,2023,Horror,FALSE,,,fall of the house of usher,https://www.google.com/search?q=fall+of+the+house+of+usher,Die Kinder eines skrupellosen Pharmabosses sterben nacheinander auf mysteriöse Weise – frei nach Edgar Allan Poe.\nDerry Girls,Derry Girls,prüfen,Serie,2018,Comedy,FALSE,,,Derry Girls,https://www.google.com/search?q=Derry+Girls,Vier Mädchen und ein englischer Junge wachsen in den 90ern in Nordirland zwischen Schule und Konflikt auf.\nDie Nanny,The Nanny,prüfen,Serie,1993,Sitcom,FALSE,,,the nanny,https://www.google.com/search?q=the+nanny,Eine schrille Verkäuferin aus Queens wird Nanny bei einem feinen Broadway-Produzenten.\nForever,Forever,prüfen,Serie,2014,\"Krimi, Drama, Fantasy\",FALSE,,,forever serie,https://www.imdb.com/de/title/tt3487382/,Ein unsterblicher Gerichtsmediziner in New York sucht nach dem Grund für sein ewiges Leben und hilft bei Mordfällen.\nGrowing Up Fisher,Growing Up Fisher,prüfen,Serie,2014,Sitcom,FALSE,,,growing up fisher,https://www.google.com/search?q=growing+up+fisher,Ein blinder Anwalt lässt sich scheiden und schafft sich einen Blindenhund an – erzählt aus Sicht seines Sohnes.\nHacks,Hacks,HBO Max,Serie,2021,Comedy,FALSE,,,hacks,https://www.google.com/search?q=hacks,\"Eine legendäre Stand-up-Komikerin in Las Vegas bekommt eine junge, unbequeme Autorin an die Seite.\"\nHannibal,Hannibal,prüfen,Serie,2013,\"Krimi, Horror\",FALSE,,,hannibal,https://www.google.com/search?q=hannibal,\"Ein FBI-Profiler mit besonderer Gabe arbeitet mit dem Psychiater Hannibal Lecter zusammen, ohne zu ahnen, wer er ist.\"\nLandman,Landman,Paramount+,Serie,2024,Drama,FALSE,,,landman,https://www.google.com/search?q=landman,Ein Krisenmanager einer Ölfirma navigiert durch das raue Geschäft der Ölfelder in West-Texas.\nLie to Me,Lie to Me,prüfen,Serie,2009,\"Krimi, Drama\",FALSE,,,lie to me,https://www.google.com/search?q=lie+to+me,\"Ein Experte für Mikroexpressionen hilft der Polizei, Lügen an Gesichtern abzulesen.\"\nLittle Demon,Little Demon,prüfen,Serie,2022,\"Animation, Comedy\",FALSE,,,little demon,https://www.google.com/search?q=little+demon,\"Eine Mutter und ihre Tochter, das Kind des Teufels, versuchen ein normales Leben in Delaware zu führen.\"\nMobLand,MobLand,Paramount+,Serie,2025,\"Krimi, Drama\",FALSE,,,tom hardy pierce brosnan,https://www.google.com/search?q=tom+hardy+pierce+brosnan,Ein Problemlöser einer Londoner Gangsterfamilie muss sie durch einen eskalierenden Machtkampf führen.\nPower,Power,prüfen,Serie,2014,\"Krimi, Drama\",FALSE,,,power,https://www.google.com/search?q=power,Ein New Yorker Nachtclubbesitzer führt ein Doppelleben als Drogenboss und will aussteigen.\nShameless,Shameless,prüfen,Serie,2011,Dramedy,FALSE,,,shameless,https://www.google.com/search?q=shameless,Die chaotische Großfamilie Gallagher schlägt sich in Chicago ohne Hilfe ihres trinkenden Vaters durch.\nSilo,Silo,Apple TV+,Serie,2023,\"Sci-Fi, Drama\",FALSE,,,silo,https://www.google.com/search?q=silo,\"Tausende Menschen leben in einem riesigen unterirdischen Silo und wissen nicht, warum und was draußen ist.\"\nSnowfall,Snowfall,prüfen,Serie,2017,\"Krimi, Drama\",FALSE,,,snowfall,https://www.google.com/search?q=snowfall,\"Die Crack-Epidemie im Los Angeles der 80er aus Sicht eines jungen Dealers, eines CIA-Agenten und eines Wrestlers.\"\nSuccession,Succession,HBO Max,Serie,2018,Drama,FALSE,,,succession,https://www.google.com/search?q=succession,Die Kinder eines Medienmoguls kämpfen erbittert um die Nachfolge im Familienimperium.\nTed Lasso,Ted Lasso,Apple TV+,Serie,2020,\"Comedy, Sport\",FALSE,,,ted lasso,https://www.google.com/search?q=ted+lasso,Ein amerikanischer Football-Coach ohne Fußballwissen soll einen englischen Premier-League-Club trainieren.\nThe Bear,The Bear,Disney+,Serie,2022,\"Drama, Comedy\",FALSE,,,the bear,https://www.google.com/search?q=the+bear,Ein Sternekoch übernimmt nach dem Tod seines Bruders dessen heruntergekommenes Sandwich-Lokal in Chicago.\nThe Chi,The Chi,prüfen,Serie,2018,Drama,FALSE,,,the chi,https://www.google.com/search?q=the+chi,Verflochtene Schicksale mehrerer Menschen in der South Side von Chicago.\nThe Day of the Jackal,The Day of the Jackal,prüfen,Serie,2024,\"Action, Krimi, Drama\",FALSE,,,the day of the jackal,https://www.imdb.com/de/title/tt24053860/,\"Ein Auftragskiller, der Schakal, wird von einer britischen Geheimdienstagentin quer durch Europa gejagt.\"\nThe Jinx,The Jinx,HBO Max,Serie,2015,\"True Crime, Doku\",FALSE,,,the jinx,https://www.google.com/search?q=the+jinx,\"Doku-Serie über den Millionärserben Robert Durst, der mit mehreren Todesfällen in Verbindung gebracht wurde.\"\nThe Old Man,The Old Man,Disney+,Serie,2022,Thriller,FALSE,,,the old man,https://www.google.com/search?q=the+old+man,\"Ein Ex-CIA-Agent, der jahrzehntelang untergetaucht war, wird von seiner Vergangenheit eingeholt.\"\nThe Terminal List,The Terminal List,Prime Video,Serie,2022,\"Action, Thriller\",FALSE,,,the terminal list,https://www.google.com/search?q=the+terminal+list,Ein Navy-SEAL überlebt einen Hinterhalt auf sein Team und rächt sich an den Verantwortlichen.\nTrue Detective,True Detective,HBO Max,Serie,2014,\"Krimi, Thriller\",FALSE,,,true detective,https://www.google.com/search?q=true+detective,Anthologie-Krimiserie: Jede Staffel folgt neuen Ermittlern in einem verstörenden Fall.\nThe Lincoln Lawyer,The Lincoln Lawyer,Netflix,Serie,2022,Justizdrama,FALSE,,,the lincoln lawyer,https://www.google.com/search?q=the+lincoln+lawyer+serie,Mickey Haller führt seine Kanzlei aus dem Lincoln und übernimmt nach einem Unfall die Fälle eines ermordeten Kollegen.\nani-cli (Tool),,,Tool,,,FALSE,,Kommandozeilen-Tool für Anime,ani cli,https://www.google.com/search?q=ani+cli,Kommandozeilen-Tool zum Suchen und Anschauen von Anime.\n";
+
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ console.warn('Speicher voll?', e); } }
+};
+
+/* ---------- CSV ---------- */
+function parseCSVRaw(text){
+  const rows=[]; let row=[], f='', q=false;
+  text = text.replace(/^﻿/, '');
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){ f+='"'; i++; } else q=false; }
+      else f+=c;
+    } else if(c==='"') q=true;
+    else if(c===','){ row.push(f); f=''; }
+    else if(c==='\n'){ row.push(f); rows.push(row); row=[]; f=''; }
+    else if(c!=='\r') f+=c;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  const head = (rows.shift()||[]).map(h=>h.trim());
+  return { head, rows: rows.filter(r => r.some(x => x.trim()!=='')) };
+}
+function toCSV(head, rows){
+  const cell = v => { v = v==null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  return [head, ...rows].map(r => head.map((_,i) => cell(r[i])).join(',')).join('\n') + '\n';
+}
+let tbl = { head:[], rows:[] }, COL = {};
+function buildMovies(){
+  const idx = n => tbl.head.findIndex(h => h.toLowerCase().startsWith(n.toLowerCase()));
+  COL = { title: idx('Titel'), en: idx('Englischer'), stream: idx('Streaming'), type: idx('Typ'),
+    year: idx('Jahr'), genre: idx('Genre'), seen: idx('Gesehen'), rating: idx('Bewertung'), note: idx('Notiz'),
+    search: idx('Suchbegriff'), link: idx('Link'), desc: idx('Beschreibung') };
+  const clean = v => (v==null ? '' : String(v).trim().replace(/^'/, ''));
+  movies = tbl.rows.map(r => {
+    const g = k => COL[k] >= 0 ? clean(r[COL[k]]) : '';
+    const year = parseInt(g('year'), 10);
+    return { _row:r, title: g('title'), en: g('en'), stream: g('stream'), type: g('type') || 'Film',
+      year: isNaN(year) ? null : year, genre: g('genre'), seen: /^(true|wahr|1|ja|x)$/i.test(g('seen')),
+      note: g('note'), link: g('link'), desc: g('desc') };
+  }).filter(m => m.title);
+}
+function setCell(row, key, val){ if(COL[key] >= 0){ while(row.length <= COL[key]) row.push(''); row[COL[key]] = val; } }
+
+/* ---------- Zustand ---------- */
+let movies = [];
+const state = { q:'', type:'', genre:'', stream:'', sort:'title', unseen:false };
+const seenLocal = LS.get('watchlist.seen', {});
+const keyOf = m => (m.title + '|' + (m.year||'')).toLowerCase();
+const isSeen = m => (!gh.on && keyOf(m) in seenLocal) ? seenLocal[keyOf(m)] : m.seen;
+function toggleSeen(m){
+  const v = !isSeen(m);
+  if(gh.on){
+    m.seen = v; setCell(m._row, 'seen', v ? 'TRUE' : 'FALSE');
+    queueSave(v ? `Gesehen: ${m.title}` : `Nicht gesehen: ${m.title}`, 1500);
+  } else { seenLocal[keyOf(m)] = v; LS.set('watchlist.seen', seenLocal); }
+  render();
+}
+let apiKey = LS.get('watchlist.tmdbKey', '');
+let region = LS.get('watchlist.region', 'DE');
+const DB_KEY = 'watchlist.tmdb.v2';
+let db = LS.get(DB_KEY, {});            // keyOf(m) -> { mt, id, d } oder { none:true }
+const IMG = s => 'https://image.tmdb.org/t/p/' + s;
+
+function hue(s){ let h=0; for(const c of s) h=(h*31+c.charCodeAt(0))>>>0; return h%360; }
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function displayTitle(m){ return m.title.replace(/\s*\((Schauspieler|Schauspielerin|Tool)\)$/,''); }
+const info = m => { const e = db[keyOf(m)]; return e && !e.none ? e : null; };
+
+function providersOf(m){
+  const e = info(m);
+  const list = e?.d?.prov?.[region];
+  if(list) return list.map(p => p.n);
+  return (m.stream && m.stream!=='prüfen') ? m.stream.split(' + ').map(s => s==='Prime' ? 'Prime Video' : s) : [];
+}
+function normProv(n){ return n.replace(/^Amazon Prime Video.*/,'Prime Video').replace(/^Netflix.*/,'Netflix').replace(/ Amazon Channel$/,''); }
+
+/* ---------- Übersicht ---------- */
+function populateFilters(){
+  const genres = new Set(), streams = new Set();
+  movies.forEach(m => {
+    const e = info(m);
+    (e?.d?.genres?.length ? e.d.genres.map(g=>g.n) : m.genre.split(',').map(s=>s.trim())).filter(Boolean).forEach(g=>genres.add(g));
+    providersOf(m).forEach(p => streams.add(p));
+  });
+  const gSel = document.getElementById('genre'), sSel = document.getElementById('stream');
+  const gv = gSel.value, sv = sSel.value;
+  gSel.length = 1; sSel.length = 1;
+  [...genres].sort((a,b)=>a.localeCompare(b,'de')).forEach(g => gSel.add(new Option(g,g)));
+  [...streams].sort((a,b)=>a.localeCompare(b,'de')).forEach(s => sSel.add(new Option(s,s)));
+  sSel.add(new Option('Kein Abo-Angebot','__none'));
+  gSel.value = gv; sSel.value = sv;
+}
+
+function genresOf(m){ const e = info(m); return e?.d?.genres?.length ? e.d.genres.map(g=>g.n) : m.genre.split(',').map(s=>s.trim()).filter(Boolean); }
+function castNames(m){ const e = info(m); return (e?.d?.cast||[]).map(c=>c.n).join(' '); }
+
+function filtered(){
+  const q = state.q.toLowerCase();
+  let list = movies.filter(m => {
+    const prov = providersOf(m);
+    return (!state.type || m.type===state.type) &&
+      (!state.genre || genresOf(m).includes(state.genre)) &&
+      (!state.stream || (state.stream==='__none' ? prov.length===0 : prov.includes(state.stream))) &&
+      (!state.unseen || !isSeen(m)) &&
+      (!q || [m.title, m.en, m.genre, m.desc, castNames(m), info(m)?.d?.ot].join(' ').toLowerCase().includes(q));
+  });
+  const byTitle = (a,b)=>displayTitle(a).localeCompare(displayTitle(b),'de',{sensitivity:'base'});
+  if(state.sort==='title') list.sort(byTitle);
+  if(state.sort==='yearDesc') list.sort((a,b)=>(b.year||0)-(a.year||0)||byTitle(a,b));
+  if(state.sort==='yearAsc') list.sort((a,b)=>(a.year||9999)-(b.year||9999)||byTitle(a,b));
+  if(state.sort==='rating') list.sort((a,b)=>(info(b)?.d?.vote||0)-(info(a)?.d?.vote||0)||byTitle(a,b));
+  return list;
+}
+
+function posterURL(m, size='w342'){ const p = info(m)?.d?.poster; return p ? IMG(size) + p : ''; }
+function phStyle(t){ const h = hue(t); return `background:linear-gradient(160deg,hsl(${h} 45% 32%),hsl(${(h+40)%360} 50% 14%))`; }
+
+function badges(m){
+  return providersOf(m).slice(0,2).map(p => {
+    const cls = p==='Netflix' ? 'b-Netflix' : p==='Prime Video' ? 'b-Prime' : '';
+    return `<span class="badge ${cls}">${esc(p)}</span>`;
+  }).join('');
+}
+
+function cardHTML(m, opts={}){
+  const t = displayTitle(m), seen = isSeen(m), p = posterURL(m);
+  const meta = [m.year, m.type, opts.mini ? '' : genresOf(m).slice(0,3).join(', ')].filter(Boolean).join(' · ');
+  const sub = !opts.mini && m.en && m.en.toLowerCase()!==m.title.toLowerCase() && !m.title.includes(m.en) ? `<div class="orig">${esc(m.en)}</div>` : '';
+  return `<article class="card${seen?' isSeen':''}" data-i="${movies.indexOf(m)}">
+    <div class="poster">
+      <div class="ph" style="${phStyle(t)}">${esc(t)}</div>
+      ${p ? `<img src="${p}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+      ${opts.mini ? '' : `<div class="badges">${badges(m)}</div><button class="seen${seen?' on':''}" title="Gesehen" aria-label="Gesehen">✓</button>`}
+    </div>
+    <div class="body">
+      <div class="title">${esc(t)}</div>${sub}
+      <div class="meta">${esc(meta)}</div>
+      ${opts.why ? `<div class="why">${esc(opts.why)}</div>` : ''}
+      ${!opts.mini && m.desc ? `<div class="desc">${esc(m.desc)}</div>` : ''}
+    </div>
+  </article>`;
+}
+
+function render(){
+  const list = filtered();
+  document.getElementById('grid').innerHTML = list.map(m => cardHTML(m)).join('');
+  document.getElementById('empty').hidden = list.length>0;
+  document.getElementById('count').textContent = `${list.length} von ${movies.length} · ${movies.filter(isSeen).length} gesehen`;
+}
+
+function onCardClick(e){
+  const card = e.target.closest('.card'); if(!card) return;
+  const m = movies[+card.dataset.i]; if(!m) return;
+  if(e.target.closest('.seen')){
+    e.stopPropagation();
+    toggleSeen(m); return;
+  }
+  location.hash = 't/' + encodeURIComponent(keyOf(m));
+}
+document.getElementById('grid').addEventListener('click', onCardClick);
+document.getElementById('sheet').addEventListener('click', e => {
+  if(e.target.closest('.card')) return onCardClick(e);
+  const pb = e.target.closest('.person'); if(pb){ location.hash = 'p/' + pb.dataset.pid; return; }
+  if(e.target.closest('.close')) closeDetail();
+  if(e.target.closest('.back')) history.back();
+  const sb = e.target.closest('[data-toggle-seen]');
+  if(sb){ toggleSeen(movies[+sb.dataset.toggleSeen]); route(); }
+  const rb = e.target.closest('[data-remove]');
+  if(rb) removeTitle(movies[+rb.dataset.remove]);
+});
+document.getElementById('overlay').addEventListener('click', e => { if(e.target.id==='overlay') closeDetail(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape' && document.getElementById('overlay').classList.contains('open')) closeDetail(); });
+
+/* ---------- TMDB ---------- */
+async function tmdb(path, params){
+  const u = new URL('https://api.themoviedb.org/3' + path);
+  u.searchParams.set('api_key', apiKey);
+  u.searchParams.set('language', 'de-DE');
+  Object.entries(params||{}).forEach(([k,v]) => v!=null && v!=='' && u.searchParams.set(k, v));
+  const r = await fetch(u);
+  if(r.status===401) throw new Error('key');
+  if(!r.ok) throw new Error('http ' + r.status);
+  return r.json();
+}
+
+async function resolveId(m){
+  if(m.type==='Tool') return null;
+  if(m.type==='Person'){
+    const d = await tmdb('/search/person', { query: displayTitle(m) });
+    const p = d.results?.[0]; return p ? { mt:'person', id:p.id } : null;
+  }
+  const imdb = (m.link.match(/tt\d+/)||[])[0];
+  if(imdb){
+    const d = await tmdb('/find/' + imdb, { external_source:'imdb_id' });
+    if(d.movie_results?.[0]) return { mt:'movie', id:d.movie_results[0].id };
+    if(d.tv_results?.[0]) return { mt:'tv', id:d.tv_results[0].id };
+  }
+  const isTV = m.type==='Serie';
+  const names = [...new Set([m.en, m.title.replace(/\s*\(.*\)$/,'')].filter(Boolean))];
+  for(const name of names){
+    for(const withYear of [true,false]){
+      const params = { query:name };
+      if(withYear && m.year) params[isTV ? 'first_air_date_year' : 'year'] = m.year;
+      const d = await tmdb(isTV ? '/search/tv' : '/search/movie', params);
+      const hit = d.results?.[0];
+      if(hit) return { mt: isTV ? 'tv' : 'movie', id: hit.id };
+    }
+  }
+  return null;
+}
+
+function slimProviders(wp){
+  const out = {};
+  for(const reg of ['DE','AT','CH']){
+    const r = wp?.results?.[reg];
+    if(!r) continue;
+    const seen = new Set(), list = [];
+    for(const p of (r.flatrate||[]).concat(r.free||[], r.ads||[])){
+      const n = normProv(p.provider_name);
+      if(!seen.has(n)){ seen.add(n); list.push({ n, l:p.logo_path }); }
+    }
+    out[reg] = list;
+  }
+  out._link = wp?.results?.[region]?.link || '';
+  return out;
+}
+
+async function fetchDetails(ref){
+  if(ref.mt==='person'){
+    const d = await tmdb('/person/' + ref.id);
+    return { name:d.name, poster:d.profile_path, bio:d.biography, born:d.birthday, place:d.place_of_birth };
+  }
+  if(ref.mt==='movie'){
+    const d = await tmdb('/movie/' + ref.id, { append_to_response:'credits,recommendations,similar,watch/providers' });
+    return {
+      t:d.title, ot:d.original_title, ov:d.overview, tag:d.tagline, poster:d.poster_path, back:d.backdrop_path,
+      date:d.release_date, runtime:d.runtime, vote:d.vote_average, votes:d.vote_count,
+      genres:(d.genres||[]).map(g=>({id:g.id,n:g.name})), imdb:d.imdb_id,
+      dir:(d.credits?.crew||[]).filter(c=>c.job==='Director').map(c=>({id:c.id,n:c.name})),
+      cast:(d.credits?.cast||[]).slice(0,18).map(c=>({id:c.id,n:c.name,r:c.character,p:c.profile_path})),
+      rec:(d.recommendations?.results||[]).map(x=>x.id), sim:(d.similar?.results||[]).map(x=>x.id),
+      prov:slimProviders(d['watch/providers'])
+    };
+  }
+  const d = await tmdb('/tv/' + ref.id, { append_to_response:'aggregate_credits,recommendations,similar,watch/providers,external_ids' });
+  return {
+    t:d.name, ot:d.original_name, ov:d.overview, tag:d.tagline, poster:d.poster_path, back:d.backdrop_path,
+    date:d.first_air_date, last:d.last_air_date, status:d.status, vote:d.vote_average, votes:d.vote_count,
+    seasonsN:d.number_of_seasons, episodesN:d.number_of_episodes,
+    epRuntime:(d.episode_run_time||[])[0] || d.last_episode_to_air?.runtime || null,
+    seasons:(d.seasons||[]).filter(s=>s.season_number>0).map(s=>({n:s.season_number,name:s.name,ep:s.episode_count,date:s.air_date})),
+    genres:(d.genres||[]).map(g=>({id:g.id,n:g.name})), imdb:d.external_ids?.imdb_id,
+    net:(d.networks||[]).map(n=>n.name),
+    dir:(d.created_by||[]).map(c=>({id:c.id,n:c.name})),
+    cast:(d.aggregate_credits?.cast||[]).slice(0,18).map(c=>({id:c.id,n:c.name,r:(c.roles||[]).map(r=>r.character).filter(Boolean).join(', '),p:c.profile_path,ep:c.total_episode_count})),
+    rec:(d.recommendations?.results||[]).map(x=>x.id), sim:(d.similar?.results||[]).map(x=>x.id),
+    prov:slimProviders(d['watch/providers'])
+  };
+}
+
+let loading = false;
+async function loadAll(){
+  if(!apiKey || loading) return;
+  loading = true;
+  const todo = movies.filter(m => { const e = db[keyOf(m)]; return !e || (e.src ?? null) !== (m.link || ''); });
+  const st = document.getElementById('loadStatus');
+  let i = 0, done = 0, keyBad = false, netErr = 0;
+  const show = () => { st.textContent = todo.length ? `· TMDB ${done}/${todo.length}` : ''; };
+  show();
+  async function worker(){
+    while(i < todo.length && !keyBad){
+      const m = todo[i++];
+      try{
+        const ref = await resolveId(m);
+        db[keyOf(m)] = ref ? { ...ref, src: m.link || '', d: await fetchDetails(ref) } : { none:true, src: m.link || '' };
+      }catch(e){ if(e.message==='key') keyBad = true; else netErr++; }
+      done++; show();
+      if(done % 8 === 0){ LS.set(DB_KEY, db); render(); }
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  LS.set(DB_KEY, db);
+  loading = false;
+  st.textContent = netErr ? `· ${netErr} Titel konnten nicht geladen werden (Werbeblocker? „Alles neu laden“ probieren)` : '';
+  populateFilters(); render(); route();
+  if(keyBad){ document.getElementById('keyStatus').textContent = 'Der Schlüssel wurde von TMDB abgelehnt.'; openSettings(); }
+}
+
+/* ---------- Detailansicht ---------- */
+const overlay = document.getElementById('overlay'), sheet = document.getElementById('sheet');
+let navDepth = 0;
+function closeDetail(){
+  overlay.classList.remove('open'); document.body.classList.remove('modal-open');
+  if(navDepth > 0){ const n = navDepth; navDepth = 0; history.go(-n); }
+  else { history.replaceState(null, '', location.pathname + location.search); route(); }
+}
+function openSheet(html){
+  sheet.innerHTML = html; overlay.classList.add('open'); document.body.classList.add('modal-open'); overlay.scrollTop = 0;
+}
+function fmtDate(s){ if(!s) return ''; const [y,mo,d] = s.split('-'); return d ? `${d}.${mo}.${y}` : s; }
+function fmtMin(n){ if(!n) return ''; const h = Math.floor(n/60), m = n%60; return h ? `${h} Std. ${m ? m + ' Min.' : ''}`.trim() : `${m} Min.`; }
+const statusDE = { 'Returning Series':'läuft noch', 'Ended':'beendet', 'Canceled':'abgesetzt', 'In Production':'in Produktion', 'Planned':'geplant' };
+
+/* Wer aus deiner Liste spielt in welchen Titeln mit */
+function personIndex(){
+  const idx = {};
+  movies.forEach(m => {
+    const e = info(m); if(!e || e.mt==='person') return;
+    (e.d.cast||[]).forEach(c => (idx[c.id] ||= { n:c.n, p:c.p, items:[] }).items.push({ m, r:c.r, kind:'Rolle' }));
+    (e.d.dir||[]).forEach(c => (idx[c.id] ||= { n:c.n, p:null, items:[] }).items.push({ m, r: e.mt==='tv' ? 'Idee/Showrunner' : 'Regie', kind:'Crew' }));
+  });
+  return idx;
+}
+
+function similarInList(m){
+  const e = info(m); if(!e || e.mt==='person') return [];
+  const myGenres = new Set((e.d.genres||[]).map(g=>g.id));
+  const myCast = new Set((e.d.cast||[]).slice(0,10).map(c=>c.id));
+  const myDir = new Set((e.d.dir||[]).map(c=>c.id));
+  const recs = new Set([...(e.d.rec||[]), ...(e.d.sim||[])]);
+  const out = [];
+  movies.forEach(o => {
+    if(o===m) return;
+    const f = info(o); if(!f || f.mt==='person') return;
+    let score = 0; const why = [];
+    if(recs.has(f.id) && f.mt===e.mt){ score += 6; why.push('von TMDB empfohlen'); }
+    const backRecs = new Set([...(f.d.rec||[]), ...(f.d.sim||[])]);
+    if(backRecs.has(e.id) && f.mt===e.mt && !why.length){ score += 5; why.push('von TMDB empfohlen'); }
+    const sharedCast = (f.d.cast||[]).slice(0,10).filter(c=>myCast.has(c.id));
+    if(sharedCast.length){ score += 3*sharedCast.length; why.push('mit ' + sharedCast.slice(0,2).map(c=>c.n).join(', ')); }
+    const sharedDir = (f.d.dir||[]).filter(c=>myDir.has(c.id));
+    if(sharedDir.length){ score += 4; why.push((e.mt==='tv'?'gleiche Macher':'gleiche Regie')); }
+    const g = (f.d.genres||[]).filter(x=>myGenres.has(x.id));
+    if(g.length >= 2 || (g.length === 1 && myGenres.size === 1)){ score += g.length; if(!why.length) why.push(g.map(x=>x.n).join(', ')); }
+    if(score >= 2) out.push({ o, score, why: why.join(' · ') });
+  });
+  return out.sort((a,b)=>b.score-a.score).slice(0,12);
+}
+
+function personTile(c, inListCount){
+  const pic = c.p ? `style="background-image:url('${IMG('w185')}${c.p}')"` : '';
+  const ini = c.n.split(' ').map(s=>s[0]).slice(0,2).join('');
+  return `<button class="person" data-pid="${c.id}">
+    <div class="pic" ${pic}>${c.p ? '' : `<span>${esc(ini)}</span>`}</div>
+    <div class="pn">${esc(c.n)}</div>
+    <div class="pr">${esc(c.r || '')}${c.ep ? ` · ${c.ep} Folgen` : ''}</div>
+    ${inListCount > 1 ? `<span class="inlist">${inListCount} in deiner Liste</span>` : ''}
+  </button>`;
+}
+
+function detailTitle(m){
+  const e = info(m), d = e?.d || {};
+  const t = displayTitle(m), i = movies.indexOf(m), seen = isSeen(m);
+  const p = posterURL(m, 'w500');
+  const back = d.back ? `style="background-image:url('${IMG('w1280')}${d.back}')"` : '';
+  const facts = [];
+  if(d.vote) facts.push(`<span class="fact star">★ ${d.vote.toFixed(1)}</span>`);
+  facts.push(`<span class="fact">${esc(m.type)}</span>`);
+  if(e?.mt==='movie'){
+    if(d.date) facts.push(`<span class="fact">${fmtDate(d.date)}</span>`); else if(m.year) facts.push(`<span class="fact">${m.year}</span>`);
+    if(d.runtime) facts.push(`<span class="fact">⏱ ${fmtMin(d.runtime)}</span>`);
+  } else if(e?.mt==='tv'){
+    const yrs = d.date ? d.date.slice(0,4) + (d.last && d.last.slice(0,4)!==d.date.slice(0,4) ? '–' + d.last.slice(0,4) : '') : m.year;
+    if(yrs) facts.push(`<span class="fact">${yrs}</span>`);
+    if(d.seasonsN) facts.push(`<span class="fact">${d.seasonsN} Staffel${d.seasonsN>1?'n':''}</span>`);
+    if(d.episodesN) facts.push(`<span class="fact">${d.episodesN} Folgen</span>`);
+    if(d.epRuntime) facts.push(`<span class="fact">⏱ ca. ${fmtMin(d.epRuntime)} pro Folge</span>`);
+    if(d.status) facts.push(`<span class="fact">${esc(statusDE[d.status] || d.status)}</span>`);
+  } else if(m.year) facts.push(`<span class="fact">${m.year}</span>`);
+  genresOf(m).forEach(g => facts.push(`<span class="fact">${esc(g)}</span>`));
+
+  const provList = d.prov?.[region];
+  let provHTML = '';
+  if(provList) provHTML = provList.length
+      ? provList.map(pv => `<span class="fact provider">${pv.l ? `<img src="${IMG('w45')}${pv.l}" alt="">` : ''}${esc(pv.n)}</span>`).join('')
+      : `<span class="fact">In ${region} aktuell in keinem Abo</span>`;
+  else if(providersOf(m).length) provHTML = providersOf(m).map(n=>`<span class="fact">${esc(n)}</span>`).join('');
+
+  const crew = d.dir?.length ? `<div class="note">${e.mt==='tv' ? 'Idee' : 'Regie'}: ${d.dir.map(c=>`<a href="#p/${c.id}">${esc(c.n)}</a>`).join(', ')}${d.net?.length ? ' · Sender: ' + esc(d.net.join(', ')) : ''}</div>` : '';
+  const idx = personIndex();
+  const castHTML = (d.cast||[]).map(c => personTile(c, idx[c.id]?.items.length || 0)).join('');
+  const seasonsHTML = (d.seasons||[]).map(s => `<div class="season"><b>${esc(s.name || 'Staffel ' + s.n)}</b>${s.ep ? s.ep + ' Folgen' : ''}${s.date ? ' · ' + s.date.slice(0,4) : ''}</div>`).join('');
+  const sims = similarInList(m);
+  const imdbLink = d.imdb ? `https://www.imdb.com/de/title/${d.imdb}/` : (/imdb\.com/.test(m.link) ? m.link : '');
+
+  return `
+    ${navDepth > 1 ? '<button class="back">‹ Zurück</button>' : ''}
+    <button class="close" aria-label="Schließen">✕</button>
+    <div class="hero" ${back}>
+      <div class="hero-in">
+        <div class="hero-poster"><div class="ph" style="${phStyle(t)}">${esc(t)}</div>${p ? `<img src="${p}" alt="">` : ''}</div>
+        <div class="hero-txt">
+          <h2>${esc(d.t || t)}</h2>
+          ${d.ot && d.ot !== (d.t||t) ? `<div class="orig">${esc(d.ot)}</div>` : (m.en && m.en!==t ? `<div class="orig">${esc(m.en)}</div>` : '')}
+          ${d.tag ? `<div class="tagline">„${esc(d.tag)}“</div>` : ''}
+          <div class="facts">${facts.join('')}</div>
+          ${provHTML ? `<div class="facts">${provHTML}</div>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      <p class="overview">${esc(d.ov || m.desc || 'Keine Beschreibung vorhanden.')}</p>
+      ${crew}
+      ${m.note ? `<div class="note">Notiz: ${esc(m.note)}</div>` : ''}
+      <div class="actions">
+        <button class="btn${seen ? ' primary' : ''}" data-toggle-seen="${i}">${seen ? '✓ Gesehen' : 'Als gesehen markieren'}</button>
+        ${imdbLink ? `<a class="btn" href="${esc(imdbLink)}" target="_blank" rel="noopener" style="text-decoration:none">IMDb ↗</a>` : ''}
+        ${e ? `<a class="btn" href="https://www.themoviedb.org/${e.mt}/${e.id}" target="_blank" rel="noopener" style="text-decoration:none">TMDB ↗</a>` : ''}
+        ${d.prov?._link ? `<a class="btn" href="${esc(d.prov._link)}" target="_blank" rel="noopener" style="text-decoration:none">Wo streamen ↗</a>` : ''}
+        ${gh.on ? `<button class="btn danger" data-remove="${i}">Aus Liste entfernen</button>` : ''}
+      </div>
+      ${!e ? `<div class="hint" style="margin-top:16px">${apiKey ? (loading ? 'Daten werden gerade von TMDB geladen …' : 'Zu diesem Titel wurde bei TMDB nichts gefunden.') : 'Für Besetzung, Laufzeit, Staffeln und ähnliche Titel oben auf ⚙︎ TMDB klicken und deinen API-Schlüssel eintragen.'}</div>` : ''}
+    </div>
+    ${seasonsHTML ? `<div class="sec"><h3>Staffeln</h3><div class="seasons">${seasonsHTML}</div></div>` : ''}
+    ${castHTML ? `<div class="sec"><h3>Besetzung</h3><div class="cast">${castHTML}</div></div>` : ''}
+    ${e ? `<div class="sec"><h3>Ähnliche Titel in deiner Liste</h3>${sims.length ? `<div class="mini">${sims.map(s => cardHTML(s.o, { mini:true, why:s.why })).join('')}</div>` : '<div class="hint">Keine passenden Titel in deiner Liste gefunden.</div>'}</div>` : ''}
+  `;
+}
+
+const personCache = {};
+async function detailPerson(pid){
+  const idx = personIndex();
+  const entry = idx[pid];
+  const listPerson = movies.find(m => info(m)?.mt==='person' && info(m).id===pid);
+  let pd = personCache[pid] || (listPerson ? info(listPerson).d : null);
+  const name = pd?.name || entry?.n || 'Person';
+  const pic = pd?.poster || entry?.p;
+  const items = entry?.items || [];
+  const html = (extra) => `
+    ${navDepth > 1 ? '<button class="back">‹ Zurück</button>' : ''}
+    <button class="close" aria-label="Schließen">✕</button>
+    <div class="hero">
+      <div class="hero-in">
+        <div class="hero-poster">${pic ? `<img src="${IMG('w342')}${pic}" alt="">` : `<div class="ph" style="${phStyle(name)}">${esc(name)}</div>`}</div>
+        <div class="hero-txt">
+          <h2>${esc(name)}</h2>
+          <div class="facts">
+            ${pd?.born ? `<span class="fact">geb. ${fmtDate(pd.born)}</span>` : ''}
+            ${pd?.place ? `<span class="fact">${esc(pd.place)}</span>` : ''}
+            <span class="fact">${items.length} Titel in deiner Liste</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sec">
+      ${pd?.bio ? `<p class="overview">${esc(pd.bio.length > 900 ? pd.bio.slice(0,900).replace(/\s\S*$/,'') + ' …' : pd.bio)}</p>` : ''}
+      ${extra || ''}
+      <div class="actions"><a class="btn" href="https://www.themoviedb.org/person/${pid}" target="_blank" rel="noopener" style="text-decoration:none">Alle Filme auf TMDB ↗</a></div>
+    </div>
+    <div class="sec"><h3>In deiner Liste</h3>
+      ${items.length ? `<div class="mini">${items.map(it => cardHTML(it.m, { mini:true, why: it.r ? (it.kind==='Crew' ? it.r : 'als ' + it.r) : '' })).join('')}</div>` : '<div class="hint">Kein weiterer Titel aus deiner Liste.</div>'}
+    </div>`;
+  openSheet(html());
+  if(!pd && apiKey){
+    try{
+      const d = await tmdb('/person/' + pid);
+      pd = personCache[pid] = { name:d.name, poster:d.profile_path, bio:d.biography, born:d.birthday, place:d.place_of_birth };
+      if(location.hash === '#p/' + pid) openSheet(html());
+    }catch(e){}
+  }
+}
+
+function route(){
+  const h = decodeURIComponent(location.hash.slice(1));
+  if(h.startsWith('t/')){
+    const m = movies.find(x => keyOf(x) === h.slice(2));
+    if(!m) return;
+    if(m.type==='Person' && info(m)) return detailPerson(info(m).id);
+    openSheet(detailTitle(m));
+  } else if(h.startsWith('p/')){
+    detailPerson(+h.slice(2));
+  } else {
+    overlay.classList.remove('open'); document.body.classList.remove('modal-open'); navDepth = 0;
+  }
+}
+window.addEventListener('hashchange', () => {
+  const h = location.hash.slice(1);
+  if(h.startsWith('t/') || h.startsWith('p/')){
+    if(!history.state || history.state.d !== navDepth){ navDepth++; history.replaceState({ d:navDepth }, ''); }
+  }
+  route();
+});
+window.addEventListener('popstate', e => { navDepth = e.state?.d || 0; });
+
+/* ---------- Toast ---------- */
+let toastT;
+function toast(msg, ms=3500){ const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove('show'), ms); }
+
+/* ---------- GitHub: Liste lesen und speichern ---------- */
+const gh = { repo: LS.get('watchlist.ghRepo',''), token: LS.get('watchlist.ghToken',''), path:'filme.csv', sha:null, on:false };
+gh.on = !!(gh.repo && gh.token);
+function b64encode(str){ const bytes = new TextEncoder().encode(str); let bin=''; for(let i=0;i<bytes.length;i+=0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i,i+0x8000)); return btoa(bin); }
+function b64decode(b64){ const bin = atob(b64.replace(/\s/g,'')); const bytes = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); return new TextDecoder().decode(bytes); }
+async function ghApi(method, body){
+  const r = await fetch(`https://api.github.com/repos/${gh.repo}/contents/${gh.path}`, {
+    method, cache:'no-store',
+    headers:{ 'Authorization':'Bearer ' + gh.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if(r.status===401 || r.status===403) throw new Error('ghauth');
+  if(r.status===404) throw new Error('gh404');
+  if(r.status===409 || r.status===422) throw new Error('ghconflict');
+  if(!r.ok) throw new Error('gh ' + r.status);
+  return r.json();
+}
+async function ghLoad(){ const d = await ghApi('GET'); gh.sha = d.sha; return b64decode(d.content); }
+
+let saveTimer = null, saveMsgs = [], saving = false, pendingOps = [];
+function queueSave(msg, delay=0, op){
+  saveMsgs.push(msg); if(op) pendingOps.push(op);
+  clearTimeout(saveTimer); saveTimer = setTimeout(doSave, delay);
+}
+async function doSave(){
+  if(saving){ saveTimer = setTimeout(doSave, 800); return; }
+  saving = true;
+  const msgs = saveMsgs.splice(0), ops = pendingOps.splice(0);
+  const message = msgs.length === 1 ? msgs[0] : `${msgs.length} Änderungen: ` + msgs.slice(0,5).join('; ');
+  const st = document.getElementById('loadStatus');
+  st.textContent = '· speichere …';
+  for(let attempt=0; attempt<3; attempt++){
+    try{
+      const d = await ghApi('PUT', { message, content: b64encode(toCSV(tbl.head, tbl.rows)), sha: gh.sha });
+      gh.sha = d.content.sha; st.textContent = ''; toast('Gespeichert ✓ – auf anderen Geräten nach dem Neuladen sichtbar');
+      saving = false; return;
+    }catch(e){
+      if(e.message==='ghconflict'){
+        // Jemand (anderes Gerät) hat zwischendurch gespeichert: neu laden, Änderungen erneut anwenden
+        try{
+          const fresh = parseCSVRaw(await ghLoad());
+          const seenNow = new Map(movies.map(m => [keyOf(m), m.seen]));
+          tbl = fresh; buildMovies();
+          movies.forEach(m => { const k = keyOf(m); if(seenNow.has(k) && seenNow.get(k)!==m.seen){ m.seen = seenNow.get(k); setCell(m._row,'seen', m.seen?'TRUE':'FALSE'); } });
+          ops.forEach(op => op());
+          continue;
+        }catch(e2){}
+      }
+      st.textContent = '';
+      toast(e.message==='ghauth' ? 'GitHub hat den Schlüssel abgelehnt – bitte in ⚙︎ prüfen.' : 'Speichern bei GitHub fehlgeschlagen. Bitte später erneut versuchen.', 6000);
+      saving = false; return;
+    }
+  }
+  saving = false;
+}
+
+function removeTitle(m){
+  if(!m || !confirm(`„${m.title}“ wirklich aus der Liste entfernen?`)) return;
+  const k = keyOf(m);
+  const op = () => { const i = tbl.rows.findIndex(r => keyOf({ title: String(r[COL.title]||'').trim().replace(/^'/,''), year: parseInt(r[COL.year],10)||null }) === k); if(i>=0) tbl.rows.splice(i,1); buildMovies(); };
+  op(); closeDetail(); populateFilters(); render();
+  queueSave(`Entfernt: ${m.title}`, 0, op);
+}
+
+/* ---------- Neue Titel bei TMDB suchen und hinzufügen ---------- */
+const addq = document.getElementById('addq'), addres = document.getElementById('addres');
+let addTimer, lastHits = [];
+function inListRef(mt, id){ return movies.find(m => { const e = info(m); return e && e.mt===mt && e.id===id; }); }
+addq.addEventListener('input', () => {
+  clearTimeout(addTimer);
+  const q = addq.value.trim();
+  if(q.length < 2){ addres.classList.remove('open'); return; }
+  addTimer = setTimeout(() => searchTMDB(q), 350);
+});
+addq.addEventListener('focus', () => { if(addres.innerHTML && addq.value.trim().length>=2) addres.classList.add('open'); });
+document.addEventListener('click', e => { if(!e.target.closest('.addwrap')) addres.classList.remove('open'); });
+async function searchTMDB(q){
+  addres.classList.add('open');
+  if(!apiKey){ addres.innerHTML = '<div class="addmsg">Zuerst oben unter ⚙︎ TMDB deinen TMDB-Schlüssel eintragen.</div>'; return; }
+  addres.innerHTML = '<div class="addmsg">Suche …</div>';
+  try{
+    const d = await tmdb('/search/multi', { query:q, include_adult:'false' });
+    if(addq.value.trim() !== q) return;
+    lastHits = (d.results||[]).filter(r => r.media_type==='movie' || r.media_type==='tv').slice(0,10);
+    if(!lastHits.length){ addres.innerHTML = '<div class="addmsg">Nichts gefunden.</div>'; return; }
+    addres.innerHTML = lastHits.map((r,i) => {
+      const t = r.title || r.name, y = (r.release_date || r.first_air_date || '').slice(0,4);
+      const ot = r.original_title || r.original_name;
+      const have = inListRef(r.media_type, r.id);
+      return `<div class="hit">
+        <div class="hp" ${r.poster_path ? `style="background-image:url('${IMG('w92')}${r.poster_path}')"` : ''}></div>
+        <div class="ht"><b>${esc(t)}</b><span>${[y, r.media_type==='tv'?'Serie':'Film', ot && ot!==t ? ot : ''].filter(Boolean).map(esc).join(' · ')}</span></div>
+        ${have ? `<span class="inl">✓ in Liste</span>` : `<button class="btn" data-add="${i}">＋ Hinzufügen</button>`}
+      </div>`;
+    }).join('');
+  }catch(e){
+    addres.innerHTML = `<div class="addmsg">${e.message==='key' ? 'TMDB hat den Schlüssel abgelehnt.' : 'Suche fehlgeschlagen.'}</div>`;
+  }
+}
+addres.addEventListener('click', async e => {
+  const b = e.target.closest('[data-add]'); if(!b) return;
+  const r = lastHits[+b.dataset.add]; if(!r) return;
+  b.disabled = true; b.textContent = '…';
+  try{ await addTitle(r); b.outerHTML = '<span class="inl">✓ hinzugefügt</span>'; }
+  catch(err){ b.disabled = false; b.textContent = '＋ Hinzufügen'; toast('Hinzufügen fehlgeschlagen.'); }
+});
+function shortText(s, max=260){
+  if(!s) return '';
+  const parts = s.match(/[^.!?]+[.!?]+(\s|$)/g) || [s];
+  let out = '';
+  for(const p of parts){ if((out + p).length > max && out) break; out += p; }
+  return out.trim() || s.slice(0, max);
+}
+async function addTitle(r){
+  const ref = { mt: r.media_type, id: r.id };
+  const d = await fetchDetails(ref);
+  let en = '';
+  try{ const x = await tmdb(`/${ref.mt}/${ref.id}`, { language:'en-US' }); en = x.title || x.name || ''; }catch(e){}
+  const title = d.t || r.title || r.name;
+  const year = (d.date || '').slice(0,4);
+  const prov = (d.prov?.[region] || []).map(p => p.n);
+  const link = d.imdb ? `https://www.imdb.com/de/title/${d.imdb}/` : `https://www.themoviedb.org/${ref.mt}/${ref.id}`;
+  const row = new Array(tbl.head.length).fill('');
+  const asText = v => /^\d+$/.test(v) ? "'" + v : v;
+  setCell(row,'title', asText(title)); setCell(row,'en', asText(en || d.ot || title));
+  setCell(row,'stream', prov.length ? prov.slice(0,2).join(' + ') : 'prüfen');
+  setCell(row,'type', ref.mt==='tv' ? 'Serie' : 'Film'); setCell(row,'year', year);
+  setCell(row,'genre', (d.genres||[]).map(g=>g.n).join(', ')); setCell(row,'seen','FALSE');
+  setCell(row,'search', addq.value.trim()); setCell(row,'link', link);
+  setCell(row,'desc', shortText(d.ov));
+  tbl.rows.push(row);
+  buildMovies();
+  const m = movies[movies.length-1];
+  db[keyOf(m)] = { ...ref, src: link, d }; LS.set(DB_KEY, db);
+  populateFilters(); render();
+  if(gh.on) queueSave(`Hinzugefügt: ${title}${year ? ' (' + year + ')' : ''}`, 0, () => { tbl.rows.push(row.slice()); buildMovies(); });
+  else { LS.set('watchlist.localCsv', toCSV(tbl.head, tbl.rows)); toast('Hinzugefügt – nur in diesem Browser. Für alle Geräte GitHub unter ⚙︎ einrichten.', 6000); }
+}
+
+/* ---------- Einstellungen ---------- */
+const dlg = document.getElementById('settings');
+function openSettings(){ document.getElementById('keyInput').value = apiKey; document.getElementById('regionSel').value = region; document.getElementById('ghRepo').value = gh.repo; document.getElementById('ghToken').value = gh.token; dlg.showModal(); }
+document.getElementById('settingsBtn').onclick = () => { document.getElementById('keyStatus').textContent = apiKey ? 'Ein Schlüssel ist gespeichert.' : ''; openSettings(); };
+document.getElementById('closeSettings').onclick = () => dlg.close();
+document.getElementById('saveKey').onclick = async () => {
+  apiKey = document.getElementById('keyInput').value.trim();
+  region = document.getElementById('regionSel').value;
+  LS.set('watchlist.tmdbKey', apiKey); LS.set('watchlist.region', region);
+  const repo = document.getElementById('ghRepo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/$/,'');
+  const token = document.getElementById('ghToken').value.trim();
+  const ghChanged = repo !== gh.repo || token !== gh.token;
+  gh.repo = repo; gh.token = token; LS.set('watchlist.ghRepo', repo); LS.set('watchlist.ghToken', token);
+  const wasOn = gh.on; gh.on = !!(repo && token);
+  if(gh.on && ghChanged){
+    try{
+      tbl = parseCSVRaw(await ghLoad()); buildMovies();
+      // Gesehen-Haken aus diesem Browser einmalig übernehmen
+      let n = 0;
+      movies.forEach(m => { const k = keyOf(m); if(k in seenLocal && seenLocal[k] !== m.seen){ m.seen = seenLocal[k]; setCell(m._row,'seen', m.seen?'TRUE':'FALSE'); n++; } });
+      if(n) queueSave(`Gesehen-Status von ${n} Titeln übernommen`);
+      toast('Mit GitHub verbunden ✓');
+    }catch(e){
+      gh.on = wasOn && false;
+      document.getElementById('keyStatus').textContent = e.message==='ghauth' ? 'GitHub hat den Schlüssel abgelehnt.' : e.message==='gh404' ? 'Repository oder filme.csv nicht gefunden – Schreibweise „benutzername/watchlist“ prüfen.' : 'Verbindung zu GitHub fehlgeschlagen.';
+      return;
+    }
+  }
+  dlg.close(); populateFilters(); render(); loadAll();
+};
+document.getElementById('exportCsv').onclick = () => {
+  const rows = tbl.rows.map(r => r.slice());
+  if(!gh.on) movies.forEach((m,i) => { if(keyOf(m) in seenLocal){ const r = rows[tbl.rows.indexOf(m._row)]; if(r && COL.seen>=0) r[COL.seen] = seenLocal[keyOf(m)] ? 'TRUE' : 'FALSE'; } });
+  const blob = new Blob([toCSV(tbl.head, rows)], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'filme.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+};
+document.getElementById('clearCache').onclick = () => {
+  db = {}; LS.set(DB_KEY, db); dlg.close(); render(); loadAll();
+};
+
+/* ---------- Filter ---------- */
+document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; render(); });
+document.getElementById('genre').onchange = e => { state.genre = e.target.value; render(); };
+document.getElementById('stream').onchange = e => { state.stream = e.target.value; render(); };
+document.getElementById('sort').onchange = e => { state.sort = e.target.value; render(); };
+document.getElementById('unseen').onchange = e => { state.unseen = e.target.checked; render(); };
+document.querySelectorAll('#typeChips .chip').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#typeChips .chip').forEach(x => x.classList.toggle('on', x===b));
+  state.type = b.dataset.type; render();
+});
+
+/* ---------- Start ---------- */
+(async function init(){
+  try{ localStorage.removeItem('watchlist.posterCache'); }catch(e){}
+  let text = null;
+  if(gh.on){
+    try{ text = await ghLoad(); }
+    catch(e){ gh.on = false; toast(e.message==='ghauth' ? 'GitHub-Schlüssel abgelehnt – Liste nur lesbar. Bitte in ⚙︎ prüfen.' : 'GitHub nicht erreichbar – zeige gespeicherte Liste.', 6000); }
+  }
+  if(text == null){
+    try{ const r = await fetch('filme.csv', { cache:'no-store' }); if(r.ok) text = await r.text(); }catch(e){}
+  }
+  if(text == null) text = FALLBACK_CSV;
+  if(!gh.on){ const local = LS.get('watchlist.localCsv', null); if(local) text = local; }
+  tbl = parseCSVRaw(text);
+  buildMovies();
+  populateFilters();
+  render();
+  if(location.hash){ const h = location.hash; history.replaceState(null, '', location.pathname + location.search); location.hash = h; }
+  loadAll();
+})();
+</script>
+</body>
+</html>
