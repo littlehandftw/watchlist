@@ -30,6 +30,11 @@
   .toggle{display:flex;align-items:center;gap:6px;color:var(--muted);cursor:pointer;user-select:none}
   .count{color:var(--muted);font-size:13px}
   .counts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  .filters{display:contents}
+  .filters > *{order:1}
+  #settingsBtn{order:2}
+  .counts{order:3}
+  .iconbtn{display:none;width:40px;height:40px;flex:0 0 auto;border-radius:50%;border:1px solid var(--accent);background:var(--accent);color:#111;font-size:22px;font-weight:700;line-height:1;cursor:pointer}
   main{max-width:1400px;margin:0 auto;padding:22px 20px 60px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:20px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s;cursor:pointer}
@@ -123,12 +128,50 @@
   .primary{background:var(--accent);color:#111;border-color:var(--accent);font-weight:600}
   .status{font-size:12px;color:var(--muted);min-height:1em;margin-bottom:8px}
   @media (max-width:600px){
-    .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
-    .counts{margin-left:0;width:100%}
+    html,body{font-size:14px}
+    .bar{padding:10px 12px 8px;gap:8px;flex-wrap:wrap}
+    h1{font-size:19px;margin:0}
+    .bar > .search{flex:1 1 0;min-width:0;padding:8px 14px}
+    .addwrap{display:none;flex:1 1 0;min-width:0}
+    body.adding .addwrap{display:block}
+    body.adding .bar > #q{display:none}
+    .iconbtn{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px}
+    body.adding .iconbtn{background:var(--panel2);color:var(--text);border-color:var(--line);transform:rotate(45deg)}
+    .iconish{width:38px;height:38px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
+    .iconish .lbl,.toggle .lbl{display:none}
+    #settingsBtn,.counts,.filters > *{order:0}
+    .filters{display:flex;width:100%;flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+    .filters::-webkit-scrollbar{display:none}
+    .filters .chips{flex:0 0 auto;gap:4px}
+    .filters select,.filters .chip{flex:0 0 auto;padding:6px 11px;font-size:13px}
+    .filters select{max-width:150px}
+    .toggle{flex:0 0 auto;font-size:13px;white-space:nowrap;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+    .toggle input{margin:0}
+    .counts{width:100%;margin:0;font-size:11px}
+    .count{font-size:11px}
+    .addres{position:fixed;left:8px;right:8px;top:62px;min-width:0;max-height:75vh}
+    main{padding:12px 10px 40px}
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .card{border-radius:10px}
+    .card:hover{transform:none}
+    .body{padding:7px 9px 9px;gap:2px}
+    .title{font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .orig,.desc{display:none}
+    .meta{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ph{font-size:15px;padding:10px}
+    .badges{top:6px;left:6px;right:38px}
+    .badge{font-size:10px;padding:2px 6px}
+    .seen{top:6px;right:6px;width:28px;height:28px;font-size:13px}
     .overlay{padding:0}
     .sheet{border-radius:0;min-height:100%;border:none}
-    .hero{padding:58px 16px 18px}.sec{padding:4px 16px 20px}
-    .hero-poster{width:120px}.hero-txt h2{font-size:22px}
+    .hero{padding:58px 14px 16px}.sec{padding:4px 14px 18px}
+    .hero-in{gap:14px;align-items:flex-start;flex-wrap:nowrap}
+    .hero-poster{width:110px}.hero-txt h2{font-size:20px}
+    .fact{font-size:12px;padding:3px 9px}
+    .cast{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .mini{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .mini .card .why{display:none}
+    footer{padding:0 12px 30px}
   }
 </style>
 </head>
@@ -141,21 +184,24 @@
       <input id="addq" class="search" type="search" placeholder="＋ Neuen Titel bei TMDB suchen …" autocomplete="off">
       <div class="addres" id="addres"></div>
     </div>
-    <div class="chips" id="typeChips">
-      <button class="chip on" data-type="">Alle</button>
-      <button class="chip" data-type="Film">Filme</button>
-      <button class="chip" data-type="Serie">Serien</button>
+    <button class="iconbtn" id="addToggle" title="Neuen Titel hinzufügen" aria-label="Neuen Titel hinzufügen">＋</button>
+    <button class="btn iconish" id="settingsBtn" title="Einstellungen">⚙︎<span class="lbl"> TMDB</span></button>
+    <div class="filters">
+      <div class="chips" id="typeChips">
+        <button class="chip on" data-type="">Alle</button>
+        <button class="chip" data-type="Film">Filme</button>
+        <button class="chip" data-type="Serie">Serien</button>
+      </div>
+      <select id="genre"><option value="">Alle Genres</option></select>
+      <select id="stream"><option value="">Alle Dienste</option></select>
+      <select id="sort">
+        <option value="title">A–Z</option>
+        <option value="yearDesc">Neueste zuerst</option>
+        <option value="yearAsc">Älteste zuerst</option>
+        <option value="rating">Beste Bewertung</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="unseen"> <span class="lbl">nur </span>ungesehen</label>
     </div>
-    <select id="genre"><option value="">Alle Genres</option></select>
-    <select id="stream"><option value="">Alle Dienste</option></select>
-    <select id="sort">
-      <option value="title">A–Z</option>
-      <option value="yearDesc">Neueste zuerst</option>
-      <option value="yearAsc">Älteste zuerst</option>
-      <option value="rating">Beste Bewertung</option>
-    </select>
-    <label class="toggle"><input type="checkbox" id="unseen"> nur ungesehen</label>
-    <button class="btn" id="settingsBtn" title="Einstellungen">⚙︎ TMDB</button>
     <div class="counts"><span class="count" id="count"></span><span class="count" id="loadStatus"></span></div>
   </div>
 </header>
@@ -756,6 +802,11 @@ function removeTitle(m){
 }
 
 /* ---------- Neue Titel bei TMDB suchen und hinzufügen ---------- */
+document.getElementById('addToggle').onclick = () => {
+  const on = document.body.classList.toggle('adding');
+  if(on) setTimeout(() => document.getElementById('addq').focus(), 0);
+  else { document.getElementById('addq').value = ''; document.getElementById('addres').classList.remove('open'); }
+};
 const addq = document.getElementById('addq'), addres = document.getElementById('addres');
 let addTimer, lastHits = [];
 function inListRef(mt, id){ return movies.find(m => { const e = info(m); return e && e.mt===mt && e.id===id; }); }
