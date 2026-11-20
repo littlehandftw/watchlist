@@ -114,6 +114,13 @@
   .hit .btn{padding:6px 12px;font-size:13px;white-space:nowrap}
   .hit .inl{font-size:12px;color:var(--ok);white-space:nowrap}
   .addmsg{padding:12px 14px;color:var(--muted);font-size:13px}
+  .addmsg.warn{color:var(--accent)}
+  .manual{padding:12px 14px;display:grid;gap:8px}
+  .manual input,.manual select{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+  .manual .row2{display:flex;gap:8px}
+  .keyrow{position:relative}
+  .keyrow input{padding-right:84px}
+  .reveal{position:absolute;right:6px;top:6px;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;color:var(--muted)}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#232833;border:1px solid var(--line);color:var(--text);padding:10px 16px;border-radius:999px;z-index:100;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none;max-width:92vw}
   .toast.show{display:block}
   .danger{color:#ff8a8a}
@@ -222,7 +229,7 @@
 <dialog id="settings">
   <h2>TMDB-Einstellungen</h2>
   <p>Trag hier deinen TMDB-API-Schlüssel (v3, der kurze) ein. Er wird nur in diesem Browser gespeichert und nicht mit der Seite veröffentlicht.</p>
-  <input id="keyInput" type="password" placeholder="API-Schlüssel" autocomplete="off">
+  <div class="keyrow"><input id="keyInput" type="password" placeholder="API-Schlüssel" autocomplete="off"><button type="button" class="reveal" data-reveal="keyInput">👁 Anzeigen</button></div>
   <label for="regionSel">Streaming-Angebote für</label>
   <select id="regionSel">
     <option value="DE">Deutschland</option>
@@ -232,7 +239,7 @@
   <h3>GitHub (Liste speichern)</h3>
   <p>Damit hinzugefügte Titel und der Gesehen-Haken auf allen Geräten landen. Schlüssel bleibt nur in diesem Browser.</p>
   <input id="ghRepo" type="text" placeholder="benutzername/watchlist" autocomplete="off">
-  <input id="ghToken" type="password" placeholder="GitHub-Zugangsschlüssel (github_pat_…)" autocomplete="off">
+  <div class="keyrow"><input id="ghToken" type="password" placeholder="GitHub-Zugangsschlüssel (github_pat_…)" autocomplete="off"><button type="button" class="reveal" data-reveal="ghToken">👁 Anzeigen</button></div>
   <div class="status" id="keyStatus"></div>
   <div class="row" style="justify-content:flex-start;margin-bottom:10px">
     <button class="btn" id="exportCsv">Liste als CSV herunterladen</button>
@@ -513,7 +520,7 @@ let loading = false;
 async function loadAll(){
   if(!apiKey || loading) return;
   loading = true;
-  const todo = movies.filter(m => { const e = db[keyOf(m)]; return !e || (e.src ?? null) !== (m.link || ''); });
+  const todo = movies.filter(m => { const e = db[keyOf(m)]; return !e || (e.src ?? null) !== (m.link || '') || (e.none && m.type!=='Tool' && Date.now() - (e.t||0) > 3*864e5); });
   const st = document.getElementById('loadStatus');
   let i = 0, done = 0, keyBad = false, netErr = 0;
   const show = () => { st.textContent = todo.length ? `· TMDB ${done}/${todo.length}` : ''; };
@@ -523,7 +530,7 @@ async function loadAll(){
       const m = todo[i++];
       try{
         const ref = await resolveId(m);
-        db[keyOf(m)] = ref ? { ...ref, src: m.link || '', d: await fetchDetails(ref) } : { none:true, src: m.link || '' };
+        db[keyOf(m)] = ref ? { ...ref, src: m.link || '', d: await fetchDetails(ref) } : { none:true, src: m.link || '', t: Date.now() };
       }catch(e){ if(e.message==='key') keyBad = true; else netErr++; }
       done++; show();
       if(done % 8 === 0){ LS.set(DB_KEY, db); render(); }
@@ -818,30 +825,58 @@ addq.addEventListener('input', () => {
 });
 addq.addEventListener('focus', () => { if(addres.innerHTML && addq.value.trim().length>=2) addres.classList.add('open'); });
 document.addEventListener('click', e => { if(!e.target.closest('.addwrap')) addres.classList.remove('open'); });
+function hitHTML(r, i){
+  const t = r.title || r.name, y = (r.release_date || r.first_air_date || '').slice(0,4);
+  const ot = r.original_title || r.original_name;
+  const have = inListRef(r.media_type, r.id);
+  return `<div class="hit">
+    <div class="hp" ${r.poster_path ? `style="background-image:url('${IMG('w92')}${r.poster_path}')"` : ''}></div>
+    <div class="ht"><b>${esc(t)}</b><span>${[y, r.media_type==='tv'?'Serie':'Film', ot && ot!==t ? ot : ''].filter(Boolean).map(esc).join(' · ')}</span></div>
+    ${have ? `<span class="inl">✓ in Liste</span>` : (gh.on ? `<button class="btn" data-add="${i}">＋ Hinzufügen</button>` : '')}
+  </div>`;
+}
+const noGhNote = '<div class="addmsg warn">Zum Hinzufügen unter ⚙︎ GitHub verbinden – ohne Verbindung wird nichts gespeichert.</div>';
+let manualImdb = '';
 async function searchTMDB(q){
   addres.classList.add('open');
   if(!apiKey){ addres.innerHTML = '<div class="addmsg">Zuerst oben unter ⚙︎ TMDB deinen TMDB-Schlüssel eintragen.</div>'; return; }
   addres.innerHTML = '<div class="addmsg">Suche …</div>';
+  const imdb = (q.match(/tt\d{6,10}/) || [])[0];
   try{
-    const d = await tmdb('/search/multi', { query:q, include_adult:'false' });
-    if(addq.value.trim() !== q) return;
-    lastHits = (d.results||[]).filter(r => r.media_type==='movie' || r.media_type==='tv').slice(0,10);
-    if(!lastHits.length){ addres.innerHTML = '<div class="addmsg">Nichts gefunden.</div>'; return; }
-    addres.innerHTML = lastHits.map((r,i) => {
-      const t = r.title || r.name, y = (r.release_date || r.first_air_date || '').slice(0,4);
-      const ot = r.original_title || r.original_name;
-      const have = inListRef(r.media_type, r.id);
-      return `<div class="hit">
-        <div class="hp" ${r.poster_path ? `style="background-image:url('${IMG('w92')}${r.poster_path}')"` : ''}></div>
-        <div class="ht"><b>${esc(t)}</b><span>${[y, r.media_type==='tv'?'Serie':'Film', ot && ot!==t ? ot : ''].filter(Boolean).map(esc).join(' · ')}</span></div>
-        ${have ? `<span class="inl">✓ in Liste</span>` : `<button class="btn" data-add="${i}">＋ Hinzufügen</button>`}
-      </div>`;
-    }).join('');
+    if(imdb){
+      const d = await tmdb('/find/' + imdb, { external_source:'imdb_id' });
+      if(addq.value.trim() !== q) return;
+      lastHits = [ ...(d.movie_results||[]).map(r => ({ ...r, media_type:'movie' })), ...(d.tv_results||[]).map(r => ({ ...r, media_type:'tv' })) ];
+      if(!lastHits.length){
+        manualImdb = imdb;
+        addres.innerHTML = `<div class="addmsg">TMDB kennt <b>${esc(imdb)}</b> (noch) nicht.${gh.on ? ' Du kannst den Titel trotzdem von Hand eintragen – Plakat und Infos kommen automatisch, sobald TMDB ihn aufnimmt.' : ''}</div>` +
+          (gh.on ? `<div class="manual">
+            <input id="mTitle" placeholder="Titel">
+            <div class="row2"><input id="mYear" placeholder="Jahr" inputmode="numeric" style="max-width:110px">
+            <select id="mType"><option>Film</option><option>Serie</option></select></div>
+            <button class="btn primary" data-manual="1">＋ Von Hand hinzufügen</button>
+          </div>` : noGhNote);
+        return;
+      }
+    } else {
+      const d = await tmdb('/search/multi', { query:q, include_adult:'false' });
+      if(addq.value.trim() !== q) return;
+      lastHits = (d.results||[]).filter(r => r.media_type==='movie' || r.media_type==='tv').slice(0,10);
+      if(!lastHits.length){ addres.innerHTML = '<div class="addmsg">Nichts gefunden. Tipp: Schreibweise prüfen oder den IMDb-Link des Titels hier einfügen.</div>'; return; }
+    }
+    addres.innerHTML = (gh.on ? '' : noGhNote) + lastHits.map(hitHTML).join('');
   }catch(e){
     addres.innerHTML = `<div class="addmsg">${e.message==='key' ? 'TMDB hat den Schlüssel abgelehnt.' : 'Suche fehlgeschlagen.'}</div>`;
   }
 }
 addres.addEventListener('click', async e => {
+  const mb = e.target.closest('[data-manual]');
+  if(mb){
+    const title = document.getElementById('mTitle').value.trim();
+    if(!title){ document.getElementById('mTitle').focus(); return; }
+    addManual(title, document.getElementById('mYear').value.trim(), document.getElementById('mType').value, manualImdb);
+    mb.outerHTML = '<span class="inl">✓ hinzugefügt</span>'; return;
+  }
   const b = e.target.closest('[data-add]'); if(!b) return;
   const r = lastHits[+b.dataset.add]; if(!r) return;
   b.disabled = true; b.textContent = '…';
@@ -855,7 +890,18 @@ function shortText(s, max=260){
   for(const p of parts){ if((out + p).length > max && out) break; out += p; }
   return out.trim() || s.slice(0, max);
 }
+function addManual(title, year, type, imdb){
+  if(!gh.on){ toast('Zum Hinzufügen unter ⚙︎ GitHub verbinden.'); return; }
+  const row = new Array(tbl.head.length).fill('');
+  const asText = v => /^\d+$/.test(v) ? "'" + v : v;
+  setCell(row,'title', asText(title)); setCell(row,'en', asText(title)); setCell(row,'stream','prüfen');
+  setCell(row,'type', type); setCell(row,'year', /^\d{4}$/.test(year) ? year : ''); setCell(row,'seen','FALSE');
+  setCell(row,'search', addq.value.trim()); setCell(row,'link', `https://www.imdb.com/de/title/${imdb}/`);
+  tbl.rows.push(row); buildMovies(); populateFilters(); render();
+  queueSave(`Hinzugefügt (von Hand): ${title}${year ? ' (' + year + ')' : ''}`, 0, () => { tbl.rows.push(row.slice()); buildMovies(); });
+}
 async function addTitle(r){
+  if(!gh.on){ toast('Zum Hinzufügen unter ⚙︎ GitHub verbinden.'); return; }
   const ref = { mt: r.media_type, id: r.id };
   const d = await fetchDetails(ref);
   let en = '';
@@ -878,7 +924,7 @@ async function addTitle(r){
   db[keyOf(m)] = { ...ref, src: link, d }; LS.set(DB_KEY, db);
   populateFilters(); render();
   if(gh.on) queueSave(`Hinzugefügt: ${title}${year ? ' (' + year + ')' : ''}`, 0, () => { tbl.rows.push(row.slice()); buildMovies(); });
-  else { LS.set('watchlist.localCsv', toCSV(tbl.head, tbl.rows)); toast('Hinzugefügt – nur in diesem Browser. Für alle Geräte GitHub unter ⚙︎ einrichten.', 6000); }
+
 }
 
 /* ---------- Einstellungen ---------- */
@@ -886,6 +932,13 @@ const dlg = document.getElementById('settings');
 function openSettings(){ document.getElementById('keyInput').value = apiKey; document.getElementById('regionSel').value = region; document.getElementById('ghRepo').value = gh.repo; document.getElementById('ghToken').value = gh.token; dlg.showModal(); }
 document.getElementById('settingsBtn').onclick = () => { document.getElementById('keyStatus').textContent = apiKey ? 'Ein Schlüssel ist gespeichert.' : ''; openSettings(); };
 document.getElementById('closeSettings').onclick = () => dlg.close();
+document.querySelectorAll('[data-reveal]').forEach(b => b.onclick = () => {
+  const inp = document.getElementById(b.dataset.reveal);
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  b.textContent = show ? '🙈 Verbergen' : '👁 Anzeigen';
+});
+dlg.addEventListener('close', () => document.querySelectorAll('[data-reveal]').forEach(b => { document.getElementById(b.dataset.reveal).type = 'password'; b.textContent = '👁 Anzeigen'; }));
 document.getElementById('saveKey').onclick = async () => {
   apiKey = document.getElementById('keyInput').value.trim();
   region = document.getElementById('regionSel').value;
@@ -945,7 +998,6 @@ document.querySelectorAll('#typeChips .chip').forEach(b => b.onclick = () => {
     try{ const r = await fetch('filme.csv', { cache:'no-store' }); if(r.ok) text = await r.text(); }catch(e){}
   }
   if(text == null) text = FALLBACK_CSV;
-  if(!gh.on){ const local = LS.get('watchlist.localCsv', null); if(local) text = local; }
   tbl = parseCSVRaw(text);
   buildMovies();
   populateFilters();
